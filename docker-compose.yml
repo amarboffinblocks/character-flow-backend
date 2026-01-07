@@ -1,0 +1,100 @@
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: youruniverse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-youruniverse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-youruniverse_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-youruniverse_db}
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-youruniverse}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - youruniverse-network
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: youruniverse-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - youruniverse-network
+
+  # ============================================
+  # Node.js API Server
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: youruniverse-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 8000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-youruniverse}:${POSTGRES_PASSWORD:-youruniverse_secret}@postgres:5432/${POSTGRES_DB:-youruniverse_db}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-your-access-secret-change-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-refresh-secret-change-in-production}
+    ports:
+      - '8000:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - youruniverse-network
+
+  # ============================================
+  # Python Microservice (Chat/AI) - Future
+  # ============================================
+  # python-chat:
+  #   build:
+  #     context: ./services/python-chat
+  #     dockerfile: Dockerfile
+  #   container_name: youruniverse-python-chat
+  #   restart: unless-stopped
+  #   environment:
+  #     REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-youruniverse}:${POSTGRES_PASSWORD:-youruniverse_secret}@postgres:5432/${POSTGRES_DB:-youruniverse_db}?schema=public
+  #   ports:
+  #     - '8001:8001'
+  #   depends_on:
+  #     - redis
+  #     - postgres
+  #   networks:
+  #     - youruniverse-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  youruniverse-network:
+    driver: bridge
+

@@ -1,0 +1,467 @@
+// ============================================
+// Prisma Schema for youruniverse.ai
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum Role {
+  user
+  admin
+}
+
+enum SubscriptionPlan {
+  adventurer
+  explorer
+  voyager
+  pioneer
+}
+
+enum Rating {
+  SFW
+  NSFW
+}
+
+enum Visibility {
+  public
+  private
+}
+
+enum TokenTransactionType {
+  credit
+  debit
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  expired
+  pending
+}
+
+// ============================================
+// User Model
+// ============================================
+
+model User {
+  id                String   @id @default(uuid())
+  name              String
+  username          String   @unique
+  email             String   @unique
+  phoneNumber       String?  @unique @map("phone_number")
+  password          String
+  avatar            Json?
+  backgroundImg     Json?    @map("background_img")
+  role              Role     @default(user)
+  isEmailVerified   Boolean  @default(false) @map("is_email_verified")
+  isPhoneVerified   Boolean  @default(false) @map("is_phone_verified")
+  subscriptionPlan  SubscriptionPlan @default(adventurer) @map("subscription_plan")
+  tokensRemaining   Int      @default(0) @map("tokens_remaining")
+  tokensUsed        Int      @default(0) @map("tokens_used")
+  profileVisibility Visibility @default(private) @map("profile_visibility")
+  profileRating     Rating   @default(SFW) @map("profile_rating")
+  theme             String?  @default("dark-purple")
+  fontStyle         String?  @default("sans-serif") @map("font_style")
+  fontSize          String?  @default("16") @map("font_size")
+  language          String?  @default("en")
+  tagsToFollow      String[] @default([]) @map("tags_to_follow")
+  tagsToAvoid       String[] @default([]) @map("tags_to_avoid")
+  aboutMe           String?  @map("about_me")
+  following         String[] @default([])
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  characters           Character[]
+  personas             Persona[]
+  lorebooks            Lorebook[]
+  realms               Realm[]
+  chats                Chat[]
+  backgrounds          Background[]
+  subscriptionHistory  SubscriptionHistory[]
+  tokenTransactions    TokenTransaction[]
+  authTokens           AuthToken[]
+  sessions             Session[]
+  otps                 Otp[]
+
+  @@map("users")
+}
+
+// ============================================
+// Auth Token Model (Email Verification, Password Reset)
+// ============================================
+
+model AuthToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  type      String   // "email_verification" | "password_reset" | "mfa"
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("auth_tokens")
+}
+
+// ============================================
+// Session Model (Refresh Tokens)
+// ============================================
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  refreshToken String   @unique @map("refresh_token")
+  userAgent    String?  @map("user_agent")
+  ipAddress    String?  @map("ip_address")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([refreshToken])
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ============================================
+// OTP Model (2FA Authentication)
+// ============================================
+
+model Otp {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  code        String   // 6-digit OTP code
+  type        String   // "login" | "email_verification" | "phone_verification" | "password_reset"
+  method      String   // "email" | "sms"
+  recipient   String   // email address or phone number
+  attempts    Int      @default(0) // Number of verification attempts
+  maxAttempts Int      @default(3) @map("max_attempts")
+  expiresAt   DateTime @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([code])
+  @@index([recipient])
+  @@index([expiresAt])
+  @@map("otps")
+}
+
+// ============================================
+// Subscription History Model
+// ============================================
+
+model SubscriptionHistory {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  plan          SubscriptionPlan
+  status        SubscriptionStatus @default(active)
+  startDate     DateTime @map("start_date")
+  endDate       DateTime @map("end_date")
+  autoRenew     Boolean  @default(true) @map("auto_renew")
+  amount        Float
+  currency      String   @default("USD")
+  paymentId     String?  @map("payment_id")
+  cancelledAt   DateTime? @map("cancelled_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("subscription_history")
+}
+
+// ============================================
+// Token Transaction Model
+// ============================================
+
+model TokenTransaction {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  type        TokenTransactionType
+  amount      Int
+  reason      String
+  metadata    Json?
+  balanceAfter Int     @map("balance_after")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("token_transactions")
+}
+
+// ============================================
+// Character Model
+// ============================================
+
+model Character {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  name              String
+  slug              String   @unique
+  description       String?
+  scenario          String?
+  summary           String?
+  rating            Rating   @default(SFW)
+  visibility        Visibility @default(private)
+  isFavourite       Boolean  @default(false) @map("is_favourite")
+  isSaved           Boolean  @default(false) @map("is_saved")
+  avatar            Json?
+  backgroundImg     Json?    @map("background_img")
+  tags              String[] @default([])
+  firstMessage      String?  @map("first_message")
+  alternateMessages String[] @default([]) @map("alternate_messages")
+  exampleDialogues  String[] @default([]) @map("example_dialogues")
+  authorNotes       String?  @map("author_notes")
+  characterNotes    String?  @map("character_notes")
+  authorName        String?  @map("author_name")
+  personaId         String?  @map("persona_id")
+  lorebookId        String?  @map("lorebook_id")
+  realmId           String?  @map("realm_id")
+  chatCount         Int      @default(0) @map("chat_count")
+  tokens            Int?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  persona    Persona?   @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  lorebook   Lorebook?  @relation(fields: [lorebookId], references: [id], onDelete: SetNull)
+  realm      Realm?     @relation(fields: [realmId], references: [id], onDelete: SetNull)
+  chats      Chat[]
+  backgrounds Background[]
+
+  @@index([userId])
+  @@index([slug])
+  @@index([visibility])
+  @@index([rating])
+  @@map("characters")
+}
+
+// ============================================
+// Persona Model
+// ============================================
+
+model Persona {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  name          String
+  slug          String   @unique
+  description   String?
+  visibility    Visibility @default(private)
+  rating        Rating   @default(SFW)
+  isFavourite   Boolean  @default(false) @map("is_favourite")
+  isSaved       Boolean  @default(false) @map("is_saved")
+  avatar        Json?
+  backgroundImg Json?    @map("background_img")
+  tags          String[] @default([])
+  lorebookId    String?  @map("lorebook_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lorebook    Lorebook?   @relation(fields: [lorebookId], references: [id], onDelete: SetNull)
+  characters  Character[]
+  backgrounds Background[]
+
+  @@index([userId])
+  @@index([slug])
+  @@map("personas")
+}
+
+// ============================================
+// Lorebook Model
+// ============================================
+
+model Lorebook {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  slug        String   @unique
+  description String?
+  visibility  Visibility @default(private)
+  rating      Rating   @default(SFW)
+  isFavourite Boolean  @default(false) @map("is_favourite")
+  isSaved     Boolean  @default(false) @map("is_saved")
+  avatar      Json?
+  tags        String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries    LorebookEntry[]
+  characters Character[]
+  personas   Persona[]
+
+  @@index([userId])
+  @@index([slug])
+  @@map("lorebooks")
+}
+
+// ============================================
+// Lorebook Entry Model
+// ============================================
+
+model LorebookEntry {
+  id         String   @id @default(uuid())
+  lorebookId String   @map("lorebook_id")
+  keyword    String
+  context    String
+  isEnabled  Boolean  @default(true) @map("is_enabled")
+  priority   Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  lorebook Lorebook @relation(fields: [lorebookId], references: [id], onDelete: Cascade)
+
+  @@index([lorebookId])
+  @@index([keyword])
+  @@map("lorebook_entries")
+}
+
+// ============================================
+// Realm Model
+// ============================================
+
+model Realm {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  slug        String   @unique
+  description String?
+  tags        String[] @default([])
+  rating      Rating   @default(SFW)
+  isFavourite Boolean  @default(false) @map("is_favourite")
+  visibility  Visibility @default(private)
+  avatar      Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characters  Character[]
+  backgrounds Background[]
+  chats       Chat[]
+
+  @@index([userId])
+  @@index([slug])
+  @@map("realms")
+}
+
+// ============================================
+// Background Model
+// ============================================
+
+model Background {
+  id              String   @id @default(uuid())
+  userId          String?  @map("user_id")
+  name            String?
+  description     String?
+  image           Json
+  tags            String[] @default([])
+  rating          Rating   @default(SFW)
+  isGlobalDefault Boolean  @default(false) @map("is_global_default")
+  isShared        Boolean  @default(false) @map("is_shared")
+  characterId     String?  @map("character_id")
+  personaId       String?  @map("persona_id")
+  realmId         String?  @map("realm_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  persona   Persona?   @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  realm     Realm?     @relation(fields: [realmId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("backgrounds")
+}
+
+// ============================================
+// Chat Model
+// ============================================
+
+model Chat {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  characterId String?  @map("character_id")
+  realmId     String?  @map("realm_id")
+  title       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  realm     Realm?     @relation(fields: [realmId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@index([userId])
+  @@index([characterId])
+  @@index([realmId])
+  @@map("chats")
+}
+
+// ============================================
+// Message Model
+// ============================================
+
+model Message {
+  id          String   @id @default(uuid())
+  chatId      String   @map("chat_id")
+  role        String   // "user" | "assistant" | "system"
+  content     String
+  tokensUsed  Int?     @map("tokens_used")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// ============================================
+// Tag Model
+// ============================================
+
+model Tag {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  category    Rating   @default(SFW) // SFW or NSFW
+  description String?
+  usageCount  Int      @default(0) @map("usage_count") // Track how many times tag is used
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@index([category])
+  @@index([usageCount])
+  @@map("tags")
+}
+
