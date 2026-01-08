@@ -237,6 +237,82 @@ export const lorebookService = {
   },
 
   // ============================================
+  // Batch Delete Lorebooks
+  // ============================================
+
+  async batchDeleteLorebooks(lorebookIds: string[], userId: string): Promise<{ success: number; failed: number; errors: Array<{ id: string; error: string }> }> {
+    if (!lorebookIds || lorebookIds.length === 0) {
+      throw createError.badRequest('Lorebook IDs array is required and cannot be empty');
+    }
+
+    if (lorebookIds.length > 100) {
+      throw createError.badRequest('Maximum 100 lorebooks can be deleted at once');
+    }
+
+    // Fetch all lorebooks and verify ownership
+    const lorebooks = await Promise.all(
+      lorebookIds.map((id) => lorebookRepository.findLorebookById(id))
+    );
+
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as Array<{ id: string; error: string }>,
+    };
+
+    // Delete lorebooks in parallel (Prisma handles transactions)
+    await Promise.all(
+      lorebooks.map(async (lorebook, index) => {
+        const lorebookId = lorebookIds[index];
+
+        // Ensure lorebookId exists
+        if (!lorebookId) {
+          results.failed++;
+          results.errors.push({
+            id: 'unknown',
+            error: 'Lorebook ID is missing',
+          });
+          return;
+        }
+
+        try {
+          // Check if lorebook exists
+          if (!lorebook) {
+            results.failed++;
+            results.errors.push({
+              id: lorebookId,
+              error: 'Lorebook not found',
+            });
+            return;
+          }
+
+          // Check if lorebook belongs to user
+          if (lorebook.userId !== userId) {
+            results.failed++;
+            results.errors.push({
+              id: lorebookId,
+              error: 'You do not have permission to delete this lorebook',
+            });
+            return;
+          }
+
+          // Delete lorebook (cascade delete will handle associated entries)
+          await lorebookRepository.deleteLorebook(lorebookId);
+          results.success++;
+        } catch (error: any) {
+          results.failed++;
+          results.errors.push({
+            id: lorebookId,
+            error: error.message || 'Unknown error occurred',
+          });
+        }
+      })
+    );
+
+    return results;
+  },
+
+  // ============================================
   // Toggle Favourite
   // ============================================
 

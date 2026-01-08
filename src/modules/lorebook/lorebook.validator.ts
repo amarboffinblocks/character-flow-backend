@@ -132,6 +132,13 @@ export const lorebookQuerySchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
+export const batchDeleteLorebookSchema = z.object({
+  lorebookIds: z
+    .array(z.string().uuid('Invalid lorebook ID format'))
+    .min(1, 'At least one lorebook ID is required')
+    .max(100, 'Maximum 100 lorebooks can be deleted at once'),
+});
+
 // ============================================
 // Type Exports
 // ============================================
@@ -141,6 +148,7 @@ export type UpdateLorebookInput = z.infer<typeof updateLorebookSchema>;
 export type LorebookQueryParams = z.infer<typeof lorebookQuerySchema>;
 export type CreateLorebookEntryInput = z.infer<typeof createLorebookEntrySchema>;
 export type UpdateLorebookEntryInput = z.infer<typeof updateLorebookEntrySchema>;
+export type BatchDeleteLorebookInput = z.infer<typeof batchDeleteLorebookSchema>;
 
 // ============================================
 // Validation Helper
