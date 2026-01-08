@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
-import type { Lorebook, LorebookEntry, Rating, Visibility } from '@prisma/client';
+import type { Lorebook, LorebookEntry, Rating, Visibility, Prisma } from '@prisma/client';
 import type {
   CreateLorebookData,
   UpdateLorebookData,
@@ -97,6 +97,7 @@ export const lorebookRepository = {
       rating,
       visibility,
       tags,
+      excludeTags,
       isFavourite,
       isSaved,
       sortBy = 'createdAt',
@@ -113,6 +114,9 @@ export const lorebookRepository = {
       isFavourite?: boolean;
       isSaved?: boolean;
       tags?: { hasEvery: string[] };
+      NOT?: Array<{
+        tags?: { hasSome: string[] };
+      }>;
       OR?: Array<{
         name?: { contains: string; mode: 'insensitive' };
         description?: { contains: string; mode: 'insensitive' };
@@ -139,6 +143,13 @@ export const lorebookRepository = {
 
     if (tags && tags.length > 0) {
       where.tags = { hasEvery: tags };
+    }
+
+    if (excludeTags && excludeTags.length > 0) {
+      // Exclude lorebooks that have any of these tags using NOT with hasSome
+      where.NOT = [
+        { tags: { hasSome: excludeTags } }
+      ];
     }
 
     if (search) {
@@ -190,6 +201,7 @@ export const lorebookRepository = {
       search,
       rating,
       tags,
+      excludeTags,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = params;
@@ -201,6 +213,9 @@ export const lorebookRepository = {
       visibility: 'public';
       rating?: Rating;
       tags?: { hasEvery: string[] };
+      NOT?: Array<{
+        tags?: { hasSome: string[] };
+      }>;
       OR?: Array<{
         name?: { contains: string; mode: 'insensitive' };
         description?: { contains: string; mode: 'insensitive' };
@@ -215,6 +230,13 @@ export const lorebookRepository = {
 
     if (tags && tags.length > 0) {
       where.tags = { hasEvery: tags };
+    }
+
+    if (excludeTags && excludeTags.length > 0) {
+      // Exclude lorebooks that have any of these tags using NOT with hasSome
+      where.NOT = [
+        { tags: { hasSome: excludeTags } }
+      ];
     }
 
     if (search) {
@@ -381,11 +403,11 @@ export const lorebookRepository = {
     return prisma.lorebookEntry.create({
       data: {
         lorebookId: data.lorebookId,
-        keyword: data.keyword,
+        keywords: data.keywords,
         context: data.context,
         isEnabled: data.isEnabled,
         priority: data.priority,
-      },
+      } as unknown as Prisma.LorebookEntryUncheckedCreateInput,
     });
   },
 
@@ -393,7 +415,7 @@ export const lorebookRepository = {
     return prisma.lorebookEntry.update({
       where: { id },
       data: {
-        ...(data.keyword && { keyword: data.keyword }),
+        ...(data.keywords && { keywords: data.keywords }),
         ...(data.context && { context: data.context }),
         ...(data.isEnabled !== undefined && { isEnabled: data.isEnabled }),
         ...(data.priority !== undefined && { priority: data.priority }),
@@ -411,11 +433,11 @@ export const lorebookRepository = {
     return prisma.lorebookEntry.createManyAndReturn({
       data: entries.map((entry) => ({
         lorebookId: entry.lorebookId,
-        keyword: entry.keyword,
+        keywords: entry.keywords,
         context: entry.context,
         isEnabled: entry.isEnabled,
         priority: entry.priority,
-      })),
+      })) as unknown as Prisma.LorebookEntryCreateManyInput[],
     });
   },
 

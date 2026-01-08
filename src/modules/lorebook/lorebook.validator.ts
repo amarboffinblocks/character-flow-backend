@@ -37,11 +37,10 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 // Lorebook Entry Validators
 // ============================================
 
-const keywordSchema = z
-  .string()
-  .min(1, 'Keyword is required')
-  .max(100, 'Keyword must be at most 100 characters')
-  .trim();
+const keywordsSchema = z
+  .array(z.string().min(1).max(100).trim())
+  .min(1, 'At least one keyword is required')
+  .max(50, 'Maximum 50 keywords allowed per entry');
 
 const contextSchema = z
   .string()
@@ -61,14 +60,14 @@ const prioritySchema = z
 // ============================================
 
 export const createLorebookEntrySchema = z.object({
-  keyword: keywordSchema,
+  keywords: keywordsSchema,
   context: contextSchema,
   isEnabled: z.boolean().optional().default(true),
   priority: prioritySchema,
 });
 
 export const updateLorebookEntrySchema = z.object({
-  keyword: keywordSchema.optional(),
+  keywords: keywordsSchema.optional(),
   context: contextSchema.optional(),
   isEnabled: z.boolean().optional(),
   priority: prioritySchema.optional(),
@@ -117,14 +116,18 @@ export const lorebookQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? val.split(',').map((tag) => tag.trim()).filter(Boolean) : undefined)),
+  excludeTags: z
+    .string()
+    .optional()
+    .transform((val) => (val ? val.split(',').map((tag) => tag.trim()).filter(Boolean) : undefined)),
   isFavourite: z
     .string()
     .optional()
-    .transform((val) => val === 'true'),
+    .transform((val) => (val === undefined ? undefined : val === 'true')),
   isSaved: z
     .string()
     .optional()
-    .transform((val) => val === 'true'),
+    .transform((val) => (val === undefined ? undefined : val === 'true')),
   sortBy: z.enum(['createdAt', 'updatedAt', 'name']).optional().default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });

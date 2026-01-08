@@ -15,7 +15,7 @@ export interface CreateLorebookInput {
 }
 
 export interface CreateLorebookEntryInput {
-  keyword: string;
+  keywords: string[];
   context: string;
   isEnabled?: boolean;
   priority?: number;
@@ -33,7 +33,7 @@ export interface UpdateLorebookInput {
 }
 
 export interface UpdateLorebookEntryInput {
-  keyword?: string;
+  keywords?: string[];
   context?: string;
   isEnabled?: boolean;
   priority?: number;
@@ -46,6 +46,7 @@ export interface LorebookQueryParams {
   rating?: Rating;
   visibility?: Visibility;
   tags?: string[];
+  excludeTags?: string[];
   isFavourite?: boolean;
   isSaved?: boolean;
   sortBy?: 'createdAt' | 'updatedAt' | 'name';
@@ -123,14 +124,14 @@ export interface UpdateLorebookData {
 
 export interface CreateLorebookEntryData {
   lorebookId: string;
-  keyword: string;
+  keywords: string[];
   context: string;
   isEnabled: boolean;
   priority: number;
 }
 
 export interface UpdateLorebookEntryData {
-  keyword?: string;
+  keywords?: string[];
   context?: string;
   isEnabled?: boolean;
   priority?: number;

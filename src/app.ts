@@ -5,9 +5,9 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { config } from './config/index.js';
 import { createFileRouter } from './lib/router.js';
-import { 
-  errorHandler, 
-  notFoundHandler, 
+import {
+  errorHandler,
+  notFoundHandler,
   redisGeneralRateLimiter,
   idempotencyMiddleware,
 } from './middleware/index.js';
@@ -32,11 +32,61 @@ export const createApp = async (): Promise<express.Application> => {
     contentSecurityPolicy: config.app.isProd,
   }));
 
+  // CORS configuration - supports ngrok and multiple origins
   app.use(cors({
-    origin: config.cors.origin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const allowedOrigin = config.cors.origin;
+
+      // Allow wildcard in development
+      if (allowedOrigin === '*' && config.app.isDev) {
+        return callback(null, true);
+      }
+
+      // Support comma-separated origins
+      const allowedOrigins = allowedOrigin.includes(',')
+        ? allowedOrigin.split(',').map(o => o.trim())
+        : [allowedOrigin];
+
+      // Check exact match
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // In development, allow ngrok URLs (https://*.ngrok.io, https://*.ngrok-free.app)
+      if (config.app.isDev && (
+        origin.includes('.ngrok.io') ||
+        origin.includes('.ngrok-free.app') ||
+        origin.includes('.ngrok.app') ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('https://localhost:')
+      )) {
+        logger.info({ origin }, 'Allowing ngrok/localhost origin in development');
+        return callback(null, true);
+      }
+
+      // Reject origin
+      logger.warn({ origin, allowedOrigins }, 'CORS blocked request');
+      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+    },
     credentials: config.cors.credentials,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Idempotency-Key',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+    ],
+    exposedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400, // Cache preflight requests for 24 hours (in seconds)
+    optionsSuccessStatus: 204, // Return 204 for OPTIONS requests
+    preflightContinue: false, // End preflight requests immediately
   }));
 
   // ============================================
@@ -76,6 +126,11 @@ export const createApp = async (): Promise<express.Application> => {
   // ============================================
 
   app.use((req, res, next) => {
+    // Skip logging OPTIONS requests (CORS preflight) to reduce log noise
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     const start = Date.now();
 
     res.on('finish', () => {
@@ -93,12 +148,11 @@ export const createApp = async (): Promise<express.Application> => {
   });
 
   // ============================================
-  // Trust Proxy (for rate limiting behind reverse proxy)
+  // Trust Proxy (for rate limiting behind reverse proxy/ngrok)
   // ============================================
 
-  if (config.app.isProd) {
-    app.set('trust proxy', 1);
-  }
+  // Always trust proxy when behind ngrok or in production
+  app.set('trust proxy', 1);
 
   // ============================================
   // API Routes (File-Based Routing)
@@ -115,7 +169,7 @@ export const createApp = async (): Promise<express.Application> => {
 
   app.get('/health', async (_req, res) => {
     const redisStatus = isRedisConnected() ? 'connected' : (redis ? 'disconnected' : 'not configured');
-    
+
     res.status(200).json({
       status: 'healthy',
       timestamp: new Date().toISOString(),

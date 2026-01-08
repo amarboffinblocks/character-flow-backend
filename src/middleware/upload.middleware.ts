@@ -38,3 +38,14 @@ export const characterImageUpload = multer({
   { name: 'backgroundImage', maxCount: 1 },
 ]);
 
+// Multer instance for lorebook image uploads
+export const lorebookImageUpload = multer({
+  storage,
+  limits: {
+    fileSize: UPLOAD_CONSTANTS.MAX_SIZE,
+    files: 1, // avatar only
+  },
+  fileFilter,
+}).fields([
+  { name: 'avatar', maxCount: 1 },
+]);

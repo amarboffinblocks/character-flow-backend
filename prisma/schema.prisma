@@ -54,45 +54,45 @@ enum SubscriptionStatus {
 // ============================================
 
 model User {
-  id                String   @id @default(uuid())
+  id                String           @id @default(uuid())
   name              String
-  username          String   @unique
-  email             String   @unique
-  phoneNumber       String?  @unique @map("phone_number")
+  username          String           @unique
+  email             String           @unique
+  phoneNumber       String?          @unique @map("phone_number")
   password          String
   avatar            Json?
-  backgroundImg     Json?    @map("background_img")
-  role              Role     @default(user)
-  isEmailVerified   Boolean  @default(false) @map("is_email_verified")
-  isPhoneVerified   Boolean  @default(false) @map("is_phone_verified")
+  backgroundImg     Json?            @map("background_img")
+  role              Role             @default(user)
+  isEmailVerified   Boolean          @default(false) @map("is_email_verified")
+  isPhoneVerified   Boolean          @default(false) @map("is_phone_verified")
   subscriptionPlan  SubscriptionPlan @default(adventurer) @map("subscription_plan")
-  tokensRemaining   Int      @default(0) @map("tokens_remaining")
-  tokensUsed        Int      @default(0) @map("tokens_used")
-  profileVisibility Visibility @default(private) @map("profile_visibility")
-  profileRating     Rating   @default(SFW) @map("profile_rating")
-  theme             String?  @default("dark-purple")
-  fontStyle         String?  @default("sans-serif") @map("font_style")
-  fontSize          String?  @default("16") @map("font_size")
-  language          String?  @default("en")
-  tagsToFollow      String[] @default([]) @map("tags_to_follow")
-  tagsToAvoid       String[] @default([]) @map("tags_to_avoid")
-  aboutMe           String?  @map("about_me")
-  following         String[] @default([])
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  tokensRemaining   Int              @default(0) @map("tokens_remaining")
+  tokensUsed        Int              @default(0) @map("tokens_used")
+  profileVisibility Visibility       @default(private) @map("profile_visibility")
+  profileRating     Rating           @default(SFW) @map("profile_rating")
+  theme             String?          @default("dark-purple")
+  fontStyle         String?          @default("sans-serif") @map("font_style")
+  fontSize          String?          @default("16") @map("font_size")
+  language          String?          @default("en")
+  tagsToFollow      String[]         @default([]) @map("tags_to_follow")
+  tagsToAvoid       String[]         @default([]) @map("tags_to_avoid")
+  aboutMe           String?          @map("about_me")
+  following         String[]         @default([])
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
 
   // Relations
-  characters           Character[]
-  personas             Persona[]
-  lorebooks            Lorebook[]
-  realms               Realm[]
-  chats                Chat[]
-  backgrounds          Background[]
-  subscriptionHistory  SubscriptionHistory[]
-  tokenTransactions    TokenTransaction[]
-  authTokens           AuthToken[]
-  sessions             Session[]
-  otps                 Otp[]
+  characters          Character[]
+  personas            Persona[]
+  lorebooks           Lorebook[]
+  realms              Realm[]
+  chats               Chat[]
+  backgrounds         Background[]
+  subscriptionHistory SubscriptionHistory[]
+  tokenTransactions   TokenTransaction[]
+  authTokens          AuthToken[]
+  sessions            Session[]
+  otps                Otp[]
 
   @@map("users")
 }
@@ -102,13 +102,13 @@ model User {
 // ============================================
 
 model AuthToken {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  token     String   @unique
-  type      String   // "email_verification" | "password_reset" | "mfa"
-  expiresAt DateTime @map("expires_at")
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  type      String // "email_verification" | "password_reset" | "mfa"
+  expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -143,17 +143,17 @@ model Session {
 // ============================================
 
 model Otp {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  code        String   // 6-digit OTP code
-  type        String   // "login" | "email_verification" | "phone_verification" | "password_reset"
-  method      String   // "email" | "sms"
-  recipient   String   // email address or phone number
-  attempts    Int      @default(0) // Number of verification attempts
-  maxAttempts Int      @default(3) @map("max_attempts")
-  expiresAt   DateTime @map("expires_at")
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  code        String // 6-digit OTP code
+  type        String // "login" | "email_verification" | "phone_verification" | "password_reset"
+  method      String // "email" | "sms"
+  recipient   String // email address or phone number
+  attempts    Int       @default(0) // Number of verification attempts
+  maxAttempts Int       @default(3) @map("max_attempts")
+  expiresAt   DateTime  @map("expires_at")
   usedAt      DateTime? @map("used_at")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -169,19 +169,19 @@ model Otp {
 // ============================================
 
 model SubscriptionHistory {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  plan          SubscriptionPlan
-  status        SubscriptionStatus @default(active)
-  startDate     DateTime @map("start_date")
-  endDate       DateTime @map("end_date")
-  autoRenew     Boolean  @default(true) @map("auto_renew")
-  amount        Float
-  currency      String   @default("USD")
-  paymentId     String?  @map("payment_id")
-  cancelledAt   DateTime? @map("cancelled_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id          String             @id @default(uuid())
+  userId      String             @map("user_id")
+  plan        SubscriptionPlan
+  status      SubscriptionStatus @default(active)
+  startDate   DateTime           @map("start_date")
+  endDate     DateTime           @map("end_date")
+  autoRenew   Boolean            @default(true) @map("auto_renew")
+  amount      Float
+  currency    String             @default("USD")
+  paymentId   String?            @map("payment_id")
+  cancelledAt DateTime?          @map("cancelled_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -194,14 +194,14 @@ model SubscriptionHistory {
 // ============================================
 
 model TokenTransaction {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  type        TokenTransactionType
-  amount      Int
-  reason      String
-  metadata    Json?
-  balanceAfter Int     @map("balance_after")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           String               @id @default(uuid())
+  userId       String               @map("user_id")
+  type         TokenTransactionType
+  amount       Int
+  reason       String
+  metadata     Json?
+  balanceAfter Int                  @map("balance_after")
+  createdAt    DateTime             @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -215,40 +215,40 @@ model TokenTransaction {
 // ============================================
 
 model Character {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
+  id                String     @id @default(uuid())
+  userId            String     @map("user_id")
   name              String
-  slug              String   @unique
+  slug              String     @unique
   description       String?
   scenario          String?
   summary           String?
-  rating            Rating   @default(SFW)
+  rating            Rating     @default(SFW)
   visibility        Visibility @default(private)
-  isFavourite       Boolean  @default(false) @map("is_favourite")
-  isSaved           Boolean  @default(false) @map("is_saved")
+  isFavourite       Boolean    @default(false) @map("is_favourite")
+  isSaved           Boolean    @default(false) @map("is_saved")
   avatar            Json?
-  backgroundImg     Json?    @map("background_img")
-  tags              String[] @default([])
-  firstMessage      String?  @map("first_message")
-  alternateMessages String[] @default([]) @map("alternate_messages")
-  exampleDialogues  String[] @default([]) @map("example_dialogues")
-  authorNotes       String?  @map("author_notes")
-  characterNotes    String?  @map("character_notes")
-  authorName        String?  @map("author_name")
-  personaId         String?  @map("persona_id")
-  lorebookId        String?  @map("lorebook_id")
-  realmId           String?  @map("realm_id")
-  chatCount         Int      @default(0) @map("chat_count")
+  backgroundImg     Json?      @map("background_img")
+  tags              String[]   @default([])
+  firstMessage      String?    @map("first_message")
+  alternateMessages String[]   @default([]) @map("alternate_messages")
+  exampleDialogues  String[]   @default([]) @map("example_dialogues")
+  authorNotes       String?    @map("author_notes")
+  characterNotes    String?    @map("character_notes")
+  authorName        String?    @map("author_name")
+  personaId         String?    @map("persona_id")
+  lorebookId        String?    @map("lorebook_id")
+  realmId           String?    @map("realm_id")
+  chatCount         Int        @default(0) @map("chat_count")
   tokens            Int?
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
 
   // Relations
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  persona    Persona?   @relation(fields: [personaId], references: [id], onDelete: SetNull)
-  lorebook   Lorebook?  @relation(fields: [lorebookId], references: [id], onDelete: SetNull)
-  realm      Realm?     @relation(fields: [realmId], references: [id], onDelete: SetNull)
-  chats      Chat[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  persona     Persona?     @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  lorebook    Lorebook?    @relation(fields: [lorebookId], references: [id], onDelete: SetNull)
+  realm       Realm?       @relation(fields: [realmId], references: [id], onDelete: SetNull)
+  chats       Chat[]
   backgrounds Background[]
 
   @@index([userId])
@@ -263,25 +263,25 @@ model Character {
 // ============================================
 
 model Persona {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
+  id            String     @id @default(uuid())
+  userId        String     @map("user_id")
   name          String
-  slug          String   @unique
+  slug          String     @unique
   description   String?
   visibility    Visibility @default(private)
-  rating        Rating   @default(SFW)
-  isFavourite   Boolean  @default(false) @map("is_favourite")
-  isSaved       Boolean  @default(false) @map("is_saved")
+  rating        Rating     @default(SFW)
+  isFavourite   Boolean    @default(false) @map("is_favourite")
+  isSaved       Boolean    @default(false) @map("is_saved")
   avatar        Json?
-  backgroundImg Json?    @map("background_img")
-  tags          String[] @default([])
-  lorebookId    String?  @map("lorebook_id")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  backgroundImg Json?      @map("background_img")
+  tags          String[]   @default([])
+  lorebookId    String?    @map("lorebook_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
 
   // Relations
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lorebook    Lorebook?   @relation(fields: [lorebookId], references: [id], onDelete: SetNull)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lorebook    Lorebook?    @relation(fields: [lorebookId], references: [id], onDelete: SetNull)
   characters  Character[]
   backgrounds Background[]
 
@@ -295,19 +295,19 @@ model Persona {
 // ============================================
 
 model Lorebook {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
+  id          String     @id @default(uuid())
+  userId      String     @map("user_id")
   name        String
-  slug        String   @unique
+  slug        String     @unique
   description String?
   visibility  Visibility @default(private)
-  rating      Rating   @default(SFW)
-  isFavourite Boolean  @default(false) @map("is_favourite")
-  isSaved     Boolean  @default(false) @map("is_saved")
+  rating      Rating     @default(SFW)
+  isFavourite Boolean    @default(false) @map("is_favourite")
+  isSaved     Boolean    @default(false) @map("is_saved")
   avatar      Json?
-  tags        String[] @default([])
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  tags        String[]   @default([])
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
 
   // Relations
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -327,7 +327,7 @@ model Lorebook {
 model LorebookEntry {
   id         String   @id @default(uuid())
   lorebookId String   @map("lorebook_id")
-  keyword    String
+  keywords   String[] @default([])
   context    String
   isEnabled  Boolean  @default(true) @map("is_enabled")
   priority   Int      @default(0)
@@ -337,7 +337,6 @@ model LorebookEntry {
   lorebook Lorebook @relation(fields: [lorebookId], references: [id], onDelete: Cascade)
 
   @@index([lorebookId])
-  @@index([keyword])
   @@map("lorebook_entries")
 }
 
@@ -346,18 +345,18 @@ model LorebookEntry {
 // ============================================
 
 model Realm {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
+  id          String     @id @default(uuid())
+  userId      String     @map("user_id")
   name        String
-  slug        String   @unique
+  slug        String     @unique
   description String?
-  tags        String[] @default([])
-  rating      Rating   @default(SFW)
-  isFavourite Boolean  @default(false) @map("is_favourite")
+  tags        String[]   @default([])
+  rating      Rating     @default(SFW)
+  isFavourite Boolean    @default(false) @map("is_favourite")
   visibility  Visibility @default(private)
   avatar      Json?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
 
   // Relations
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -431,13 +430,13 @@ model Chat {
 // ============================================
 
 model Message {
-  id          String   @id @default(uuid())
-  chatId      String   @map("chat_id")
-  role        String   // "user" | "assistant" | "system"
-  content     String
-  tokensUsed  Int?     @map("tokens_used")
-  metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
+  id         String   @id @default(uuid())
+  chatId     String   @map("chat_id")
+  role       String // "user" | "assistant" | "system"
+  content    String
+  tokensUsed Int?     @map("tokens_used")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
 
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
@@ -464,4 +463,3 @@ model Tag {
   @@index([usageCount])
   @@map("tags")
 }
-

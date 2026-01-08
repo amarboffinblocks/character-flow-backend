@@ -61,7 +61,7 @@ export const lorebookService = {
     if (input.entries && input.entries.length > 0) {
       const entryData: CreateLorebookEntryData[] = input.entries.map((entry) => ({
         lorebookId: lorebook.id,
-        keyword: entry.keyword,
+        keywords: entry.keywords,
         context: entry.context,
         isEnabled: entry.isEnabled ?? true,
         priority: entry.priority ?? 0,
@@ -302,7 +302,7 @@ export const lorebookService = {
 
     const entryData: CreateLorebookEntryData = {
       lorebookId,
-      keyword: input.keyword,
+      keywords: input.keywords,
       context: input.context,
       isEnabled: input.isEnabled ?? true,
       priority: input.priority ?? 0,
@@ -364,7 +364,7 @@ export const lorebookService = {
     }
 
     const updateData: UpdateLorebookEntryData = {
-      ...(input.keyword && { keyword: input.keyword }),
+      ...(input.keywords && { keywords: input.keywords }),
       ...(input.context && { context: input.context }),
       ...(input.isEnabled !== undefined && { isEnabled: input.isEnabled }),
       ...(input.priority !== undefined && { priority: input.priority }),
