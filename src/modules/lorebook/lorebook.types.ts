@@ -28,6 +28,7 @@ export interface UpdateLorebookInput {
   visibility?: Visibility;
   avatar?: Record<string, unknown> | null;
   tags?: string[];
+  entries?: CreateLorebookEntryInput[];
   isFavourite?: boolean;
   isSaved?: boolean;
 }

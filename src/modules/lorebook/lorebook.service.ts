@@ -212,7 +212,32 @@ export const lorebookService = {
 
     const lorebook = await lorebookRepository.updateLorebook(id, updateData);
 
-    return { lorebook };
+    // Update entries if provided
+    if (input.entries !== undefined) {
+      // Delete all existing entries
+      await lorebookRepository.deleteEntriesByLorebook(id);
+
+      // Create new entries if provided
+      if (input.entries.length > 0) {
+        const entryData: CreateLorebookEntryData[] = input.entries.map((entry) => ({
+          lorebookId: id,
+          keywords: entry.keywords,
+          context: entry.context,
+          isEnabled: entry.isEnabled ?? true,
+          priority: entry.priority ?? 0,
+        }));
+
+        await lorebookRepository.createEntries(entryData);
+      }
+    }
+
+    // Fetch lorebook with entries
+    const lorebookWithEntries = await lorebookRepository.findLorebookById(id);
+    if (!lorebookWithEntries) {
+      throw createError.notFound('Lorebook not found after update');
+    }
+
+    return { lorebook: lorebookWithEntries };
   },
 
   // ============================================

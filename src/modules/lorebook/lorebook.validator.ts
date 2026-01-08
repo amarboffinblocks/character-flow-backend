@@ -94,6 +94,7 @@ export const updateLorebookSchema = z.object({
   visibility: visibilitySchema.optional(),
   avatar: avatarSchema,
   tags: tagsSchema.optional(),
+  entries: z.array(createLorebookEntrySchema).max(100, 'Maximum 100 entries allowed').optional(),
   isFavourite: z.boolean().optional(),
   isSaved: z.boolean().optional(),
 });
