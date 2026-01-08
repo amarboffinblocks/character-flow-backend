@@ -49,3 +49,16 @@ export const lorebookImageUpload = multer({
 }).fields([
   { name: 'avatar', maxCount: 1 },
 ]);
+
+// Multer instance for persona image uploads
+export const personaImageUpload = multer({
+  storage,
+  limits: {
+    fileSize: UPLOAD_CONSTANTS.MAX_SIZE,
+    files: 2, // avatar and backgroundImage
+  },
+  fileFilter,
+}).fields([
+  { name: 'avatar', maxCount: 1 },
+  { name: 'backgroundImage', maxCount: 1 },
+]);
