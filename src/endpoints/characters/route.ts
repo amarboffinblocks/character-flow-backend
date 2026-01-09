@@ -178,6 +178,10 @@ async function processCharacterCreation(
                 ? bodyData.exampleDialogue
                 : [bodyData.exampleDialogue])
             : bodyData.exampleDialogues,
+        // Handle personaId - map from 'persona' field or use 'personaId' directly
+        personaId: bodyData.persona || bodyData.personaId || undefined,
+        // Handle lorebookId - map from 'lorebook' field or use 'lorebookId' directly
+        lorebookId: bodyData.lorebook || bodyData.lorebookId || undefined,
     };
 
     // Remove frontend-specific fields
@@ -186,6 +190,8 @@ async function processCharacterCreation(
     delete mappedData.personality;
     delete mappedData.exampleDialogue;
     delete mappedData.backgroundImage;
+    delete mappedData.persona; // Remove frontend field name (use personaId)
+    delete mappedData.lorebook; // Remove frontend field name (use lorebookId)
     const shouldFavourite = mappedData.favourite === 'true' || mappedData.favourite === true;
     delete mappedData.favourite; // Handle separately after creation
 
@@ -204,6 +210,8 @@ async function processCharacterCreation(
         authorNotes: validatedData.authorNotes ?? undefined,
         characterNotes: validatedData.characterNotes ?? undefined,
         authorName: validatedData.authorName ?? undefined,
+        personaId: validatedData.personaId ?? undefined,
+        lorebookId: validatedData.lorebookId ?? undefined,
     };
 
     // Create character

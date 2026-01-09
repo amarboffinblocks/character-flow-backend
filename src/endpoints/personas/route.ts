@@ -165,6 +165,8 @@ async function processPersonaCreation(
     visibility: bodyData.visiable || bodyData.visibility,
     avatar,
     backgroundImg,
+    // Handle lorebookId - map from 'lorebook' field or use 'lorebookId' directly
+    lorebookId: bodyData.lorebook || bodyData.lorebookId || undefined,
   };
 
   // Remove frontend-specific fields
@@ -172,6 +174,7 @@ async function processPersonaCreation(
   delete mappedData.details;
   delete mappedData.visiable;
   delete mappedData.backgroundImage;
+  delete mappedData.lorebook; // Remove frontend field name
 
   // Handle favourite separately (if provided as string 'true'/'false')
   const shouldFavourite = mappedData.favourite === 'true' || mappedData.favourite === true;
@@ -186,6 +189,7 @@ async function processPersonaCreation(
     description: validatedData.description ?? undefined,
     avatar: validatedData.avatar ?? undefined,
     backgroundImg: validatedData.backgroundImg ?? undefined,
+    lorebookId: validatedData.lorebookId ?? undefined,
   };
 
   // Create persona

@@ -16,7 +16,7 @@ export const GET = async (req: Request, res: Response): Promise<void> => {
     throw new Error('Persona ID is required');
   }
   const user = (req as AuthenticatedRequest).user;
-  
+
   const result = await personaService.getPersonaById(id, user?.id);
   sendSuccess(res, result, 'Persona retrieved successfully');
 };
@@ -175,12 +175,17 @@ async function processPersonaUpdate(
   if (backgroundImg !== null) {
     mappedData.backgroundImg = backgroundImg;
   }
+  // Handle lorebookId - map from 'lorebook' field or use 'lorebookId' directly
+  if (bodyData.lorebook !== undefined || bodyData.lorebookId !== undefined) {
+    mappedData.lorebookId = bodyData.lorebook || bodyData.lorebookId || null;
+  }
 
   // Remove frontend-specific fields
   delete mappedData.personaName;
   delete mappedData.details;
   delete mappedData.visiable;
   delete mappedData.backgroundImage;
+  delete mappedData.lorebook; // Remove frontend field name
 
   // Handle favourite separately (if provided as string 'true'/'false')
   if (mappedData.favourite !== undefined) {
@@ -207,9 +212,9 @@ export const DELETE = async (req: Request, res: Response): Promise<void> => {
     throw new Error('Persona ID is required');
   }
   const user = requireCurrentUser(req);
-  
+
   // Delete persona
   const result = await personaService.deletePersona(id, user.id);
-  
+
   sendSuccess(res, result, result.message);
 };

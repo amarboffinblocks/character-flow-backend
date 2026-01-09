@@ -244,13 +244,9 @@ export const characterRepository = {
         authorNotes: data.authorNotes,
         characterNotes: data.characterNotes,
         authorName: data.authorName,
-        // TODO: Re-enable these foreign key relationships when Persona, Lorebook, and Realm modules are fully implemented
-        // personaId: data.personaId ?? null,
-        // lorebookId: data.lorebookId ?? null,
-        // realmId: data.realmId ?? null,
-        personaId: null, // Temporarily disabled to avoid foreign key constraint errors
-        lorebookId: null, // Temporarily disabled to avoid foreign key constraint errors
-        realmId: null, // Temporarily disabled to avoid foreign key constraint errors
+        personaId: data.personaId ?? null,
+        lorebookId: data.lorebookId ?? null,
+        realmId: data.realmId ?? null,
       },
       include: {
         persona: true,
@@ -283,17 +279,18 @@ export const characterRepository = {
     if (data.authorNotes !== undefined) updateData.authorNotes = data.authorNotes;
     if (data.characterNotes !== undefined) updateData.characterNotes = data.characterNotes;
     if (data.authorName !== undefined) updateData.authorName = data.authorName;
-    // TODO: Re-enable these foreign key relationships when Persona, Lorebook, and Realm modules are fully implemented
-    // Temporarily disabled to avoid foreign key constraint errors
-    // if (data.personaId !== undefined) {
-    //   updateData.persona = data.personaId ? { connect: { id: data.personaId } } : { disconnect: true };
-    // }
-    // if (data.lorebookId !== undefined) {
-    //   updateData.lorebook = data.lorebookId ? { connect: { id: data.lorebookId } } : { disconnect: true };
-    // }
-    // if (data.realmId !== undefined) {
-    //   updateData.realm = data.realmId ? { connect: { id: data.realmId } } : { disconnect: true };
-    // }
+    
+    // Handle relationship updates
+    if (data.personaId !== undefined) {
+      updateData.personaId = data.personaId ?? null;
+    }
+    if (data.lorebookId !== undefined) {
+      updateData.lorebookId = data.lorebookId ?? null;
+    }
+    if (data.realmId !== undefined) {
+      updateData.realmId = data.realmId ?? null;
+    }
+    
     if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
     if (data.isSaved !== undefined) updateData.isSaved = data.isSaved;
 

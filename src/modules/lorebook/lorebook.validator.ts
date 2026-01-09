@@ -33,6 +33,28 @@ const tagsSchema = z
 
 const uuidSchema = z.string().uuid('Invalid ID format');
 
+// Optional UUID schema - handles empty strings and undefined
+const optionalUuidSchema = z
+  .string()
+  .optional()
+  .refine(
+    (val) => {
+      // If value is undefined, null, or empty string, it's valid (optional)
+      if (!val || val.trim() === '') return true;
+      // If value is provided, it must be a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(val);
+    },
+    { message: 'Invalid ID format' }
+  );
+
+// Array of UUIDs schema
+const uuidArraySchema = z
+  .array(z.string().uuid('Invalid ID format'))
+  .max(100, 'Maximum 100 IDs allowed')
+  .optional()
+  .default([]);
+
 // ============================================
 // Lorebook Entry Validators
 // ============================================
@@ -85,6 +107,8 @@ export const createLorebookSchema = z.object({
   avatar: avatarSchema,
   tags: tagsSchema,
   entries: z.array(createLorebookEntrySchema).max(100, 'Maximum 100 entries allowed').optional().default([]),
+  characterIds: uuidArraySchema,
+  personaIds: uuidArraySchema,
 });
 
 export const updateLorebookSchema = z.object({
@@ -95,6 +119,8 @@ export const updateLorebookSchema = z.object({
   avatar: avatarSchema,
   tags: tagsSchema.optional(),
   entries: z.array(createLorebookEntrySchema).max(100, 'Maximum 100 entries allowed').optional(),
+  characterIds: uuidArraySchema,
+  personaIds: uuidArraySchema,
   isFavourite: z.boolean().optional(),
   isSaved: z.boolean().optional(),
 });

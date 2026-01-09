@@ -134,6 +134,66 @@ async function processLorebookCreation(
     }
   }
 
+  // Parse characterIds array from form-data (comes as stringified JSON or comma-separated)
+  if (typeof bodyData.characterIds === 'string') {
+    try {
+      bodyData.characterIds = JSON.parse(bodyData.characterIds);
+    } catch {
+      // If not JSON, try comma-separated string
+      if (bodyData.characterIds.includes(',')) {
+        bodyData.characterIds = bodyData.characterIds.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+      } else {
+        bodyData.characterIds = bodyData.characterIds.trim() ? [bodyData.characterIds.trim()] : [];
+      }
+    }
+  }
+  // Handle field name variations
+  if (bodyData.Characters && !bodyData.characterIds) {
+    if (typeof bodyData.Characters === 'string') {
+      try {
+        bodyData.characterIds = JSON.parse(bodyData.Characters);
+      } catch {
+        if (bodyData.Characters.includes(',')) {
+          bodyData.characterIds = bodyData.Characters.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+        } else {
+          bodyData.characterIds = bodyData.Characters.trim() ? [bodyData.Characters.trim()] : [];
+        }
+      }
+    } else if (Array.isArray(bodyData.Characters)) {
+      bodyData.characterIds = bodyData.Characters;
+    }
+  }
+
+  // Parse personaIds array from form-data (comes as stringified JSON or comma-separated)
+  if (typeof bodyData.personaIds === 'string') {
+    try {
+      bodyData.personaIds = JSON.parse(bodyData.personaIds);
+    } catch {
+      // If not JSON, try comma-separated string
+      if (bodyData.personaIds.includes(',')) {
+        bodyData.personaIds = bodyData.personaIds.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+      } else {
+        bodyData.personaIds = bodyData.personaIds.trim() ? [bodyData.personaIds.trim()] : [];
+      }
+    }
+  }
+  // Handle field name variations
+  if (bodyData.persona && !bodyData.personaIds) {
+    if (typeof bodyData.persona === 'string') {
+      try {
+        bodyData.personaIds = JSON.parse(bodyData.persona);
+      } catch {
+        if (bodyData.persona.includes(',')) {
+          bodyData.personaIds = bodyData.persona.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+        } else {
+          bodyData.personaIds = bodyData.persona.trim() ? [bodyData.persona.trim()] : [];
+        }
+      }
+    } else if (Array.isArray(bodyData.persona)) {
+      bodyData.personaIds = bodyData.persona;
+    }
+  }
+
   // Handle avatar - prioritize uploaded file, then JSON data
   let avatar = avatarMetadata;
   if (!avatar && bodyData.avatar) {
@@ -159,6 +219,8 @@ async function processLorebookCreation(
   // Remove frontend-specific fields
   delete mappedData.lorebookName;
   delete mappedData.visiable;
+  delete mappedData.Characters; // Remove frontend field name (use characterIds)
+  delete mappedData.persona; // Remove frontend field name (use personaIds)
 
   // Handle favourite separately (if provided as string 'true'/'false')
   const shouldFavourite = mappedData.favourite === 'true' || mappedData.favourite === true;
@@ -172,6 +234,8 @@ async function processLorebookCreation(
     ...validatedData,
     description: validatedData.description ?? undefined,
     avatar: validatedData.avatar ?? undefined,
+    characterIds: validatedData.characterIds && validatedData.characterIds.length > 0 ? validatedData.characterIds : undefined,
+    personaIds: validatedData.personaIds && validatedData.personaIds.length > 0 ? validatedData.personaIds : undefined,
   };
 
   // Create lorebook

@@ -38,6 +38,21 @@ const tagsSchema = z
 
 const uuidSchema = z.string().uuid('Invalid ID format');
 
+// Optional UUID schema - handles empty strings and undefined
+const optionalUuidSchema = z
+  .string()
+  .optional()
+  .refine(
+    (val) => {
+      // If value is undefined, null, or empty string, it's valid (optional)
+      if (!val || val.trim() === '') return true;
+      // If value is provided, it must be a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(val);
+    },
+    { message: 'Invalid ID format' }
+  );
+
 // ============================================
 // Persona Schemas
 // ============================================
@@ -50,7 +65,7 @@ export const createPersonaSchema = z.object({
   avatar: avatarSchema,
   backgroundImg: backgroundImgSchema,
   tags: tagsSchema,
-  // lorebookId: uuidSchema.optional(),
+  lorebookId: optionalUuidSchema,
 });
 
 export const updatePersonaSchema = z.object({
@@ -61,7 +76,7 @@ export const updatePersonaSchema = z.object({
   avatar: avatarSchema,
   backgroundImg: backgroundImgSchema,
   tags: tagsSchema.optional(),
-  // lorebookId: uuidSchema.optional().nullable(),
+  lorebookId: optionalUuidSchema.nullable(),
   isFavourite: z.boolean().optional(),
   isSaved: z.boolean().optional(),
 });

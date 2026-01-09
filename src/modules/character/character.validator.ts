@@ -90,6 +90,21 @@ const authorNameSchema = z
 
 const uuidSchema = z.string().uuid('Invalid ID format');
 
+// Optional UUID schema - handles empty strings and undefined
+const optionalUuidSchema = z
+  .string()
+  .optional()
+  .refine(
+    (val) => {
+      // If value is undefined, null, or empty string, it's valid (optional)
+      if (!val || val.trim() === '') return true;
+      // If value is provided, it must be a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(val);
+    },
+    { message: 'Invalid ID format' }
+  );
+
 // ============================================
 // Character Schemas
 // ============================================
@@ -110,8 +125,8 @@ export const createCharacterSchema = z.object({
   authorNotes: authorNotesSchema,
   characterNotes: characterNotesSchema,
   authorName: authorNameSchema,
-  personaId: uuidSchema.optional(),
-  lorebookId: uuidSchema.optional(),
+  personaId: optionalUuidSchema,
+  lorebookId: optionalUuidSchema,
   realmId: uuidSchema.optional(),
 });
 
@@ -131,8 +146,8 @@ export const updateCharacterSchema = z.object({
   authorNotes: authorNotesSchema,
   characterNotes: characterNotesSchema,
   authorName: authorNameSchema,
-  personaId: uuidSchema.optional().nullable(),
-  lorebookId: uuidSchema.optional().nullable(),
+  personaId: optionalUuidSchema.nullable(),
+  lorebookId: optionalUuidSchema.nullable(),
   realmId: uuidSchema.optional().nullable(),
   isFavourite: z.boolean().optional(),
   isSaved: z.boolean().optional(),

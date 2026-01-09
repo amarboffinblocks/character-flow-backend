@@ -12,6 +12,8 @@ export interface CreateLorebookInput {
   avatar?: Record<string, unknown>;
   tags?: string[];
   entries?: CreateLorebookEntryInput[];
+  characterIds?: string[];
+  personaIds?: string[];
 }
 
 export interface CreateLorebookEntryInput {
@@ -29,6 +31,8 @@ export interface UpdateLorebookInput {
   avatar?: Record<string, unknown> | null;
   tags?: string[];
   entries?: CreateLorebookEntryInput[];
+  characterIds?: string[];
+  personaIds?: string[];
   isFavourite?: boolean;
   isSaved?: boolean;
 }

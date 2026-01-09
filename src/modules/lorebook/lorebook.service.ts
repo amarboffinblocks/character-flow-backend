@@ -1,6 +1,7 @@
 import { lorebookRepository } from './lorebook.repository.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
+import { prisma } from '../../lib/prisma.js';
 import type {
   CreateLorebookInput,
   UpdateLorebookInput,
@@ -68,6 +69,58 @@ export const lorebookService = {
       }));
 
       await lorebookRepository.createEntries(entryData);
+    }
+
+    // Link characters if provided
+    if (input.characterIds && input.characterIds.length > 0) {
+      // Verify all characters belong to the user
+      const characters = await prisma.character.findMany({
+        where: {
+          id: { in: input.characterIds },
+          userId,
+        },
+      });
+
+      if (characters.length !== input.characterIds.length) {
+        throw createError.badRequest('Some characters not found or do not belong to you');
+      }
+
+      // Update characters to link to this lorebook
+      await prisma.character.updateMany({
+        where: {
+          id: { in: input.characterIds },
+          userId,
+        },
+        data: {
+          lorebookId: lorebook.id,
+        },
+      });
+    }
+
+    // Link personas if provided
+    if (input.personaIds && input.personaIds.length > 0) {
+      // Verify all personas belong to the user
+      const personas = await prisma.persona.findMany({
+        where: {
+          id: { in: input.personaIds },
+          userId,
+        },
+      });
+
+      if (personas.length !== input.personaIds.length) {
+        throw createError.badRequest('Some personas not found or do not belong to you');
+      }
+
+      // Update personas to link to this lorebook
+      await prisma.persona.updateMany({
+        where: {
+          id: { in: input.personaIds },
+          userId,
+        },
+        data: {
+          lorebookId: lorebook.id,
+        },
+      });
     }
 
     // Fetch lorebook with entries
@@ -228,6 +281,86 @@ export const lorebookService = {
         }));
 
         await lorebookRepository.createEntries(entryData);
+      }
+    }
+
+    // Handle character linking if provided
+    if (input.characterIds !== undefined) {
+      // First, unlink all characters currently linked to this lorebook
+      await prisma.character.updateMany({
+        where: {
+          lorebookId: id,
+          userId, // Only unlink characters belonging to this user
+        },
+        data: {
+          lorebookId: null,
+        },
+      });
+
+      // Then, link the new characters if any
+      if (input.characterIds.length > 0) {
+        // Verify all characters belong to the user
+        const characters = await prisma.character.findMany({
+          where: {
+            id: { in: input.characterIds },
+            userId,
+          },
+        });
+
+        if (characters.length !== input.characterIds.length) {
+          throw createError.badRequest('Some characters not found or do not belong to you');
+        }
+
+        // Update characters to link to this lorebook
+        await prisma.character.updateMany({
+          where: {
+            id: { in: input.characterIds },
+            userId,
+          },
+          data: {
+            lorebookId: id,
+          },
+        });
+      }
+    }
+
+    // Handle persona linking if provided
+    if (input.personaIds !== undefined) {
+      // First, unlink all personas currently linked to this lorebook
+      await prisma.persona.updateMany({
+        where: {
+          lorebookId: id,
+          userId, // Only unlink personas belonging to this user
+        },
+        data: {
+          lorebookId: null,
+        },
+      });
+
+      // Then, link the new personas if any
+      if (input.personaIds.length > 0) {
+        // Verify all personas belong to the user
+        const personas = await prisma.persona.findMany({
+          where: {
+            id: { in: input.personaIds },
+            userId,
+          },
+        });
+
+        if (personas.length !== input.personaIds.length) {
+          throw createError.badRequest('Some personas not found or do not belong to you');
+        }
+
+        // Update personas to link to this lorebook
+        await prisma.persona.updateMany({
+          where: {
+            id: { in: input.personaIds },
+            userId,
+          },
+          data: {
+            lorebookId: id,
+          },
+        });
       }
     }
 

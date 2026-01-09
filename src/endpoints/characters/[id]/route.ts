@@ -257,6 +257,16 @@ async function processCharacterUpdate(
     mappedData.isFavourite = bodyData.favourite === 'true' || bodyData.favourite === true;
   }
 
+  // Handle personaId - map from 'persona' field or use 'personaId' directly
+  if (bodyData.persona !== undefined || bodyData.personaId !== undefined) {
+    mappedData.personaId = bodyData.persona || bodyData.personaId || null;
+  }
+
+  // Handle lorebookId - map from 'lorebook' field or use 'lorebookId' directly
+  if (bodyData.lorebook !== undefined || bodyData.lorebookId !== undefined) {
+    mappedData.lorebookId = bodyData.lorebook || bodyData.lorebookId || null;
+  }
+
   // Remove frontend-specific fields
   delete mappedData.characterName;
   delete mappedData.visiable;
@@ -264,6 +274,8 @@ async function processCharacterUpdate(
   delete mappedData.exampleDialogue;
   delete mappedData.backgroundImage;
   delete mappedData.favourite;
+  delete mappedData.persona; // Remove frontend field name (use personaId)
+  delete mappedData.lorebook; // Remove frontend field name (use lorebookId)
 
   // Validate request body
   const validatedData = updateCharacterSchema.parse(mappedData);
