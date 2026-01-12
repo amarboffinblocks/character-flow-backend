@@ -625,6 +625,182 @@ export const characterService = {
 
     return results;
   },
+
+  // ============================================
+  // Import Character
+  // ============================================
+
+  async importCharacter(userId: string, characterData: any): Promise<CharacterResponse> {
+    // Validate required fields
+    if (!characterData.name || typeof characterData.name !== 'string') {
+      throw createError.badRequest('Character name is required');
+    }
+
+    // Generate unique slug
+    let slug = generateSlug(characterData.name);
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (await characterRepository.checkSlugExists(slug)) {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw createError.internal('Failed to generate unique slug');
+      }
+      slug = generateSlug(characterData.name);
+    }
+
+    // Fetch user's name for authorName
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    const visibility = characterData.visibility ?? 'private';
+    const userActualName = user?.name ?? null;
+
+    // Handle authorName based on visibility
+    let authorName: string | null = null;
+    if (visibility === 'public') {
+      if (characterData.authorName && characterData.authorName.trim().toLowerCase() !== 'anonymous') {
+        authorName = characterData.authorName.trim();
+      } else {
+        authorName = 'Anonymous';
+      }
+    } else {
+      authorName = userActualName;
+    }
+
+    // Map imported data to CreateCharacterData
+    const createData: CreateCharacterData = {
+      userId,
+      name: characterData.name,
+      slug,
+      description: characterData.description ?? null,
+      scenario: characterData.scenario ?? null,
+      summary: characterData.summary ?? null,
+      rating: characterData.rating ?? 'SFW',
+      visibility,
+      avatar: characterData.avatar ? { url: characterData.avatar } : null,
+      backgroundImg: characterData.backgroundImg ? { url: characterData.backgroundImg } : null,
+      tags: Array.isArray(characterData.tags) ? characterData.tags : [],
+      firstMessage: characterData.firstMessage ?? null,
+      alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],
+      exampleDialogues: Array.isArray(characterData.exampleDialogues) ? characterData.exampleDialogues : [],
+      authorNotes: characterData.authorNotes ?? null,
+      characterNotes: characterData.characterNotes ?? null,
+      authorName,
+      personaId: null, // Don't import relationships
+      lorebookId: null,
+      realmId: null,
+    };
+
+    const character = await characterRepository.createCharacter(createData);
+    return { character };
+  },
+
+  // ============================================
+  // Bulk Import Characters
+  // ============================================
+
+  async bulkImportCharacters(userId: string, charactersData: any[]): Promise<{
+    success: number;
+    failed: number;
+    characters: Character[];
+    errors: Array<{ name: string; error: string }>;
+  }> {
+    const results = {
+      success: 0,
+      failed: 0,
+      characters: [] as Character[],
+      errors: [] as Array<{ name: string; error: string }>,
+    };
+
+    // Fetch user's name once
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    const userActualName = user?.name ?? null;
+
+    // Process each character
+    for (const characterData of charactersData) {
+      try {
+        // Validate required fields
+        if (!characterData.name || typeof characterData.name !== 'string') {
+          results.failed++;
+          results.errors.push({
+            name: characterData.name || 'Unknown',
+            error: 'Character name is required',
+          });
+          continue;
+        }
+
+        // Generate unique slug
+        let slug = generateSlug(characterData.name);
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        while (await characterRepository.checkSlugExists(slug)) {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw createError.internal('Failed to generate unique slug');
+          }
+          slug = generateSlug(characterData.name);
+        }
+
+        const visibility = characterData.visibility ?? 'private';
+
+        // Handle authorName based on visibility
+        let authorName: string | null = null;
+        if (visibility === 'public') {
+          if (characterData.authorName && characterData.authorName.trim().toLowerCase() !== 'anonymous') {
+            authorName = characterData.authorName.trim();
+          } else {
+            authorName = 'Anonymous';
+          }
+        } else {
+          authorName = userActualName;
+        }
+
+        // Map imported data to CreateCharacterData
+        const createData: CreateCharacterData = {
+          userId,
+          name: characterData.name,
+          slug,
+          description: characterData.description ?? null,
+          scenario: characterData.scenario ?? null,
+          summary: characterData.summary ?? null,
+          rating: characterData.rating ?? 'SFW',
+          visibility,
+          avatar: characterData.avatar ? { url: characterData.avatar } : null,
+          backgroundImg: characterData.backgroundImg ? { url: characterData.backgroundImg } : null,
+          tags: Array.isArray(characterData.tags) ? characterData.tags : [],
+          firstMessage: characterData.firstMessage ?? null,
+          alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],
+          exampleDialogues: Array.isArray(characterData.exampleDialogues) ? characterData.exampleDialogues : [],
+          authorNotes: characterData.authorNotes ?? null,
+          characterNotes: characterData.characterNotes ?? null,
+          authorName,
+          personaId: null, // Don't import relationships
+          lorebookId: null,
+          realmId: null,
+        };
+
+        const character = await characterRepository.createCharacter(createData);
+        results.success++;
+        results.characters.push(character);
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push({
+          name: characterData.name || 'Unknown',
+          error: error.message || 'Unknown error occurred',
+        });
+      }
+    }
+
+    return results;
+  },
 };
 
 export default characterService;
