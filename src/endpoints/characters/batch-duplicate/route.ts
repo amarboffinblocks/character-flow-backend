@@ -25,6 +25,7 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
       characters: result.characters,
       message: `Successfully duplicated ${result.characters.length} character(s)`,
     },
+
     `Successfully duplicated ${result.characters.length} character(s)`
   );
 };
