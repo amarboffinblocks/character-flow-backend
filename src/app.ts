@@ -155,12 +155,27 @@ export const createApp = async (): Promise<express.Application> => {
   app.set('trust proxy', 1);
 
   // ============================================
+  // Swagger API Documentation (before API routes to avoid conflicts)
+  // ============================================
+
+  try {
+    const { setupSwagger } = await import('./lib/swagger.js');
+    setupSwagger(app);
+    logger.info('✅ Swagger documentation initialized');
+  } catch (error) {
+    logger.error({ error }, '❌ Swagger setup failed, continuing without API docs');
+    // Log the full error for debugging
+    if (error instanceof Error) {
+      logger.error({ stack: error.stack }, 'Swagger setup error details');
+    }
+  }
+
+  // ============================================
   // API Routes (File-Based Routing)
   // ============================================
 
   const endpointsDir = join(__dirname, 'endpoints');
   const apiRouter = await createFileRouter(endpointsDir, `/api/${config.app.apiVersion}`);
-
   app.use(`/api/${config.app.apiVersion}`, apiRouter);
 
   // ============================================

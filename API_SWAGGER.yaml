@@ -1,0 +1,1555 @@
+openapi: 3.0.3
+info:
+  title: youruniverse.ai API
+  description: |
+    Complete API documentation for youruniverse.ai platform.
+    
+    This API provides endpoints for:
+    - Authentication and user management
+    - Character creation and management
+    - Persona management
+    - Lorebook management
+    - Tag management
+    
+    **Base URL:** `http://localhost:8000/api/v1` (Development)
+    
+    **Authentication:** Most endpoints require a Bearer token in the Authorization header.
+  version: 1.0.0
+  contact:
+    name: youruniverse.ai Support
+    email: support@youruniverse.ai
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+  - url: https://api.youruniverse.ai/api/v1
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and registration
+  - name: User
+    description: User profile management
+  - name: Characters
+    description: Character creation and management
+  - name: Personas
+    description: Persona management
+  - name: Lorebooks
+    description: Lorebook management
+  - name: Tags
+    description: Tag management
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register User
+      description: Register a new user account. Email verification required before login.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/verify:
+    get:
+      tags:
+        - Authentication
+      summary: Verify Email
+      description: Verify user email using token sent via email.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email verified successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/resend-verification:
+    post:
+      tags:
+        - Authentication
+      summary: Resend Verification Email
+      description: Resend email verification token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Verification email sent
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login - Step 1 Request OTP
+      description: Authenticate user and receive OTP. Email verification required.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - identifier
+                - password
+              properties:
+                identifier:
+                  type: string
+                  description: Email, username, or phone (E.164 format)
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/login/verify-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Verify OTP - Step 2 Complete Login
+      description: Verify OTP code and receive access/refresh tokens.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - code
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/User'
+
+  /auth/login/resend-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Resend OTP
+      description: Resend OTP code for login.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: OTP resent successfully
+
+  /auth/username/check:
+    get:
+      tags:
+        - Authentication
+      summary: Check Username Availability
+      description: Check if username is available (real-time validation).
+      security: []
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Username availability checked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available:
+                    type: boolean
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh Token
+      description: Get new access token using refresh token (token rotation).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout
+      description: Logout user and revoke refresh token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Logout successful
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Forgot Password
+      description: Request password reset link via email.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset email sent
+
+  /auth/reset-password:
+    put:
+      tags:
+        - Authentication
+      summary: Reset Password
+      description: Reset password using token from email.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - password
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Password reset successful
+
+  /user/me:
+    get:
+      tags:
+        - User
+      summary: Get Current User
+      description: Get authenticated user's profile and preferences.
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+
+  /user/profile:
+    put:
+      tags:
+        - User
+      summary: Update Profile
+      description: Update user profile information and preferences.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+
+  /characters:
+    get:
+      tags:
+        - Characters
+      summary: List Characters
+      description: Get paginated list of user's characters with filters.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Rating'
+        - $ref: '#/components/parameters/Visibility'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/ExcludeTags'
+        - $ref: '#/components/parameters/IsFavourite'
+        - $ref: '#/components/parameters/IsSaved'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Characters retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+    post:
+      tags:
+        - Characters
+      summary: Create Character
+      description: Create a new character with metadata and images.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateCharacterRequest'
+      responses:
+        '201':
+          description: Character created successfully
+
+  /characters/{id}:
+    get:
+      tags:
+        - Characters
+      summary: Get Character
+      description: Get full character details by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Character retrieved successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Characters
+      summary: Update Character
+      description: Update character fields including images.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateCharacterRequest'
+      responses:
+        '200':
+          description: Character updated successfully
+    delete:
+      tags:
+        - Characters
+      summary: Delete Character
+      description: Permanently delete character.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Character deleted successfully
+
+  /characters/{id}/favourite:
+    post:
+      tags:
+        - Characters
+      summary: Toggle Favourite
+      description: Toggle character favourite status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Favourite status toggled
+
+  /characters/{id}/saved:
+    post:
+      tags:
+        - Characters
+      summary: Toggle Saved
+      description: Toggle character saved status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Saved status toggled
+
+  /characters/batch-delete:
+    post:
+      tags:
+        - Characters
+      summary: Batch Delete Characters
+      description: Delete multiple characters at once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - characterIds
+              properties:
+                characterIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Characters deleted successfully
+
+  /characters/batch-duplicate:
+    post:
+      tags:
+        - Characters
+      summary: Batch Duplicate Characters
+      description: Duplicate multiple characters at once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - characterIds
+              properties:
+                characterIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Characters duplicated successfully
+
+  /characters/import:
+    post:
+      tags:
+        - Characters
+      summary: Import Character
+      description: Import a character from JSON or PNG file.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Character imported successfully
+
+  /characters/slug/{slug}:
+    get:
+      tags:
+        - Characters
+      summary: Get Character by Slug
+      description: Get character details by slug (public access if character is public).
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Character retrieved successfully
+
+  /personas:
+    get:
+      tags:
+        - Personas
+      summary: List Personas
+      description: Get paginated list of user's personas with filters.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Rating'
+        - $ref: '#/components/parameters/Visibility'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/ExcludeTags'
+        - $ref: '#/components/parameters/IsFavourite'
+        - $ref: '#/components/parameters/IsSaved'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Personas retrieved successfully
+    post:
+      tags:
+        - Personas
+      summary: Create Persona
+      description: Create a new persona with metadata and images.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreatePersonaRequest'
+      responses:
+        '201':
+          description: Persona created successfully
+
+  /personas/{id}:
+    get:
+      tags:
+        - Personas
+      summary: Get Persona
+      description: Get full persona details by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Persona retrieved successfully
+    put:
+      tags:
+        - Personas
+      summary: Update Persona
+      description: Update persona fields including images.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdatePersonaRequest'
+      responses:
+        '200':
+          description: Persona updated successfully
+    delete:
+      tags:
+        - Personas
+      summary: Delete Persona
+      description: Permanently delete persona.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Persona deleted successfully
+
+  /personas/{id}/favourite:
+    post:
+      tags:
+        - Personas
+      summary: Toggle Favourite
+      description: Toggle persona favourite status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Favourite status toggled
+
+  /personas/{id}/saved:
+    post:
+      tags:
+        - Personas
+      summary: Toggle Saved
+      description: Toggle persona saved status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Saved status toggled
+
+  /personas/batch-delete:
+    post:
+      tags:
+        - Personas
+      summary: Batch Delete Personas
+      description: Delete multiple personas at once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - personaIds
+              properties:
+                personaIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Personas deleted successfully
+
+  /lorebooks:
+    get:
+      tags:
+        - Lorebooks
+      summary: List Lorebooks
+      description: Get paginated list of user's lorebooks with filters.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Rating'
+        - $ref: '#/components/parameters/Visibility'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/ExcludeTags'
+        - $ref: '#/components/parameters/IsFavourite'
+        - $ref: '#/components/parameters/IsSaved'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Lorebooks retrieved successfully
+    post:
+      tags:
+        - Lorebooks
+      summary: Create Lorebook
+      description: Create a new lorebook with entries and links.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateLorebookRequest'
+      responses:
+        '201':
+          description: Lorebook created successfully
+
+  /lorebooks/{id}:
+    get:
+      tags:
+        - Lorebooks
+      summary: Get Lorebook
+      description: Get full lorebook details including entries.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lorebook retrieved successfully
+    put:
+      tags:
+        - Lorebooks
+      summary: Update Lorebook
+      description: Update lorebook fields including entries.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateLorebookRequest'
+      responses:
+        '200':
+          description: Lorebook updated successfully
+    delete:
+      tags:
+        - Lorebooks
+      summary: Delete Lorebook
+      description: Permanently delete lorebook.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lorebook deleted successfully
+
+  /lorebooks/{id}/entries:
+    get:
+      tags:
+        - Lorebooks
+      summary: List Lorebook Entries
+      description: Get all entries for a lorebook.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Entries retrieved successfully
+    post:
+      tags:
+        - Lorebooks
+      summary: Create Lorebook Entry
+      description: Add a new entry to a lorebook.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LorebookEntry'
+      responses:
+        '201':
+          description: Entry created successfully
+
+  /lorebooks/{id}/entries/{entryId}:
+    put:
+      tags:
+        - Lorebooks
+      summary: Update Lorebook Entry
+      description: Update an existing lorebook entry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LorebookEntry'
+      responses:
+        '200':
+          description: Entry updated successfully
+    delete:
+      tags:
+        - Lorebooks
+      summary: Delete Lorebook Entry
+      description: Delete an entry from a lorebook.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Entry deleted successfully
+
+  /lorebooks/{id}/favourite:
+    post:
+      tags:
+        - Lorebooks
+      summary: Toggle Favourite
+      description: Toggle lorebook favourite status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Favourite status toggled
+
+  /lorebooks/{id}/saved:
+    post:
+      tags:
+        - Lorebooks
+      summary: Toggle Saved
+      description: Toggle lorebook saved status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Saved status toggled
+
+  /lorebooks/batch-delete:
+    post:
+      tags:
+        - Lorebooks
+      summary: Batch Delete Lorebooks
+      description: Delete multiple lorebooks at once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lorebookIds
+              properties:
+                lorebookIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Lorebooks deleted successfully
+
+  /tags:
+    get:
+      tags:
+        - Tags
+      summary: List Tags
+      description: Get paginated list of tags.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [SFW, NSFW]
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Tags retrieved successfully
+    post:
+      tags:
+        - Tags
+      summary: Create Tag
+      description: Create a new tag.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - category
+              properties:
+                name:
+                  type: string
+                category:
+                  type: string
+                  enum: [SFW, NSFW]
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Tag created successfully
+
+  /tags/{id}:
+    get:
+      tags:
+        - Tags
+      summary: Get Tag
+      description: Get tag details by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tag retrieved successfully
+    put:
+      tags:
+        - Tags
+      summary: Update Tag
+      description: Update tag details.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                category:
+                  type: string
+                  enum: [SFW, NSFW]
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Tag updated successfully
+    delete:
+      tags:
+        - Tags
+      summary: Delete Tag
+      description: Delete a tag.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tag deleted successfully
+
+  /tags/popular:
+    get:
+      tags:
+        - Tags
+      summary: Get Popular Tags
+      description: Get most popular tags by usage count.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [SFW, NSFW]
+      responses:
+        '200':
+          description: Popular tags retrieved successfully
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Search:
+      name: search
+      in: query
+      description: Search query
+      schema:
+        type: string
+    Rating:
+      name: rating
+      in: query
+      description: Filter by rating
+      schema:
+        type: string
+        enum: [SFW, NSFW]
+    Visibility:
+      name: visibility
+      in: query
+      description: Filter by visibility
+      schema:
+        type: string
+        enum: [public, private]
+    Tags:
+      name: tags
+      in: query
+      description: Filter by tags (comma-separated)
+      schema:
+        type: string
+    ExcludeTags:
+      name: excludeTags
+      in: query
+      description: Exclude tags (comma-separated)
+      schema:
+        type: string
+    IsFavourite:
+      name: isFavourite
+      in: query
+      description: Filter by favourite status
+      schema:
+        type: boolean
+    IsSaved:
+      name: isSaved
+      in: query
+      description: Filter by saved status
+      schema:
+        type: boolean
+    SortBy:
+      name: sortBy
+      in: query
+      description: Sort field
+      schema:
+        type: string
+        enum: [createdAt, updatedAt, name, chatCount]
+        default: createdAt
+    SortOrder:
+      name: sortOrder
+      in: query
+      description: Sort order
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Conflict (e.g., duplicate resource)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: NOT_FOUND
+            message:
+              type: string
+              example: Resource not found
+
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        message:
+          type: string
+
+    PaginatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total:
+                  type: integer
+                totalPages:
+                  type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+          nullable: true
+
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - username
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+        password:
+          type: string
+          format: password
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        username:
+          type: string
+        aboutMe:
+          type: string
+        theme:
+          type: string
+        fontStyle:
+          type: string
+        fontSize:
+          type: string
+        language:
+          type: string
+        tagsToFollow:
+          type: array
+          items:
+            type: string
+        tagsToAvoid:
+          type: array
+          items:
+            type: string
+        profileVisibility:
+          type: string
+          enum: [public, private]
+        profileRating:
+          type: string
+          enum: [SFW, NSFW]
+
+    CreateCharacterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        scenario:
+          type: string
+        summary:
+          type: string
+        rating:
+          type: string
+          enum: [SFW, NSFW]
+        visibility:
+          type: string
+          enum: [public, private]
+        tags:
+          type: array
+          items:
+            type: string
+        firstMessage:
+          type: string
+        alternateMessages:
+          type: array
+          items:
+            type: string
+        exampleDialogues:
+          type: array
+          items:
+            type: string
+        authorNotes:
+          type: string
+        characterNotes:
+          type: string
+        avatar:
+          type: string
+          format: binary
+        backgroundImage:
+          type: string
+          format: binary
+
+    UpdateCharacterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        scenario:
+          type: string
+        summary:
+          type: string
+        rating:
+          type: string
+          enum: [SFW, NSFW]
+        visibility:
+          type: string
+          enum: [public, private]
+        tags:
+          type: array
+          items:
+            type: string
+        firstMessage:
+          type: string
+        alternateMessages:
+          type: array
+          items:
+            type: string
+        exampleDialogues:
+          type: array
+          items:
+            type: string
+        authorNotes:
+          type: string
+        characterNotes:
+          type: string
+        avatar:
+          type: string
+          format: binary
+        backgroundImage:
+          type: string
+          format: binary
+
+    CreatePersonaRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rating:
+          type: string
+          enum: [SFW, NSFW]
+        visibility:
+          type: string
+          enum: [public, private]
+        tags:
+          type: array
+          items:
+            type: string
+        avatar:
+          type: string
+          format: binary
+        backgroundImage:
+          type: string
+          format: binary
+
+    UpdatePersonaRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rating:
+          type: string
+          enum: [SFW, NSFW]
+        visibility:
+          type: string
+          enum: [public, private]
+        tags:
+          type: array
+          items:
+            type: string
+        avatar:
+          type: string
+          format: binary
+        backgroundImage:
+          type: string
+          format: binary
+
+    CreateLorebookRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rating:
+          type: string
+          enum: [SFW, NSFW]
+        visibility:
+          type: string
+          enum: [public, private]
+        tags:
+          type: array
+          items:
+            type: string
+        entries:
+          type: string
+          description: JSON array string
+        characterIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        personaIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        avatar:
+          type: string
+          format: binary
+
+    UpdateLorebookRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rating:
+          type: string
+          enum: [SFW, NSFW]
+        visibility:
+          type: string
+          enum: [public, private]
+        tags:
+          type: array
+          items:
+            type: string
+        entries:
+          type: string
+          description: JSON array string
+        characterIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        personaIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        avatar:
+          type: string
+          format: binary
+
+    LorebookEntry:
+      type: object
+      required:
+        - keywords
+        - context
+      properties:
+        keywords:
+          type: array
+          items:
+            type: string
+        context:
+          type: string
+        isEnabled:
+          type: boolean
+          default: true
+        priority:
+          type: integer
+          default: 0
+
+security:
+  - bearerAuth: []

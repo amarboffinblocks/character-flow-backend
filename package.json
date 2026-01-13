@@ -35,6 +35,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",
     "@prisma/client": "^5.22.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/yamljs": "^0.2.34",
     "argon2": "^0.41.1",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
@@ -44,6 +48,7 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.4.1",
     "jose": "^5.9.6",
+    "js-yaml": "^4.1.1",
     "multer": "^1.4.5-lts.1",
     "nanoid": "^5.0.8",
     "ngrok": "^5.0.0-beta.2",
@@ -52,7 +57,10 @@
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
     "sharp": "^0.33.5",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^10.0.0",
+    "yamljs": "^0.3.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
