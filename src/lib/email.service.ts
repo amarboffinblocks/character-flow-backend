@@ -153,10 +153,10 @@ export const emailService = {
             <p>Thank you for registering with youruniverse.ai!</p>
             <p>Please click the button below to verify your email address:</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationUrl}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a>
+              <a href="${verificationUrl}" target="_blank" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a>
             </div>
             <p style="color: #666; font-size: 14px;">Or copy and paste this link into your browser:</p>
-            <p style="color: #667eea; font-size: 12px; word-break: break-all;">${verificationUrl}</p>
+            <p style="font-size: 12px; word-break: break-all;"><a href="${verificationUrl}" target="_blank" style="color: #667eea; text-decoration: none;">${verificationUrl}</a></p>
             <p style="color: #666; font-size: 14px; margin-top: 30px;">This link will expire in 24 hours.</p>
             <p style="color: #666; font-size: 14px;">If you didn't create an account, please ignore this email.</p>
           </div>
@@ -192,10 +192,10 @@ export const emailService = {
             <p>You requested to reset your password for youruniverse.ai.</p>
             <p>Click the button below to reset your password:</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
+              <a href="${resetUrl}" target="_blank" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
             </div>
             <p style="color: #666; font-size: 14px;">Or copy and paste this link into your browser:</p>
-            <p style="color: #667eea; font-size: 12px; word-break: break-all;">${resetUrl}</p>
+            <p style="font-size: 12px; word-break: break-all;"><a href="${resetUrl}" target="_blank" style="color: #667eea; text-decoration: none;">${resetUrl}</a></p>
             <p style="color: #666; font-size: 14px; margin-top: 30px;">This link will expire in 1 hour.</p>
             <p style="color: #666; font-size: 14px;">If you didn't request a password reset, please ignore this email.</p>
           </div>

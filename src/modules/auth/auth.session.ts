@@ -68,14 +68,14 @@ export const verifyAccessToken = async (token: string): Promise<JwtPayload> => {
   } catch (error) {
     if (error instanceof jose.errors.JWTExpired) {
       logger.debug('Access token expired');
-      throw createError.unauthorized('Access token expired');
+      throw createError.unauthorized('Something went wrong, try again');
     }
     if (error instanceof jose.errors.JWTInvalid) {
       logger.debug('Invalid access token');
-      throw createError.unauthorized('Invalid access token');
+      throw createError.unauthorized('Something went wrong, try again');
     }
     logger.warn({ err: error }, 'Token verification failed');
-    throw createError.unauthorized('Token verification failed');
+    throw createError.unauthorized('Something went wrong, try again');
   }
 };
 
