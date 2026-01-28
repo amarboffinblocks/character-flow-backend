@@ -1,6 +1,7 @@
 import { personaRepository } from './persona.repository.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
+import { processImageUpload } from '../../utils/image.helper.js';
 import type {
   CreatePersonaInput,
   UpdatePersonaInput,
@@ -295,7 +296,6 @@ export const personaService = {
   // ============================================
   // Toggle Saved
   // ============================================
-
   async toggleSaved(id: string, userId: string): Promise<PersonaResponse> {
     // Verify persona exists and belongs to user
     const persona = await personaRepository.findPersonaById(id);
@@ -312,5 +312,197 @@ export const personaService = {
     const updatedPersona = await personaRepository.toggleSaved(id);
 
     return { persona: updatedPersona };
+  },
+
+  // ============================================
+  // Duplicate Persona
+  // ============================================
+
+  async duplicatePersona(id: string, userId: string): Promise<PersonaResponse> {
+    // Verify persona exists and belongs to user
+    const persona = await personaRepository.findPersonaById(id);
+
+    if (!persona) {
+      throw createError.notFound('Persona not found');
+    }
+
+    if (persona.userId !== userId) {
+      throw createError.forbidden('You do not have permission to duplicate this persona');
+    }
+
+    // Generate new name with "(Copy)" suffix
+    const newName = `${persona.name} (Copy)`;
+    const baseSlug = generateSlug(newName);
+    let slug = baseSlug;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    // Ensure slug is unique
+    while (await personaRepository.checkSlugExists(slug)) {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw createError.internal('Failed to generate unique slug');
+      }
+      slug = `${baseSlug}-${attempts}`;
+    }
+
+    // Create duplicate persona data
+    const personaData: CreatePersonaData = {
+      userId,
+      name: newName,
+      slug,
+      description: persona.description,
+      rating: persona.rating,
+      visibility: persona.visibility,
+      avatar: persona.avatar as Record<string, unknown> | null,
+      backgroundImg: persona.backgroundImg as Record<string, unknown> | null,
+      tags: persona.tags,
+      lorebookId: persona.lorebookId,
+    };
+
+    const duplicatedPersona = await personaRepository.createPersona(personaData);
+
+    // Fetch persona with relations
+    const personaWithRelations = await personaRepository.findPersonaById(duplicatedPersona.id);
+    if (!personaWithRelations) {
+      throw createError.notFound('Persona not found after duplication');
+    }
+
+    return { persona: personaWithRelations };
+  },
+
+  // ============================================
+  // Batch Duplicate Personas
+  // ============================================
+
+  async batchDuplicatePersonas(
+    personaIds: string[],
+    userId: string
+  ): Promise<{ success: number; failed: number; personas: Persona[] }> {
+    if (!personaIds || personaIds.length === 0) {
+      throw createError.badRequest('Persona IDs array is required and cannot be empty');
+    }
+
+    if (personaIds.length > 100) {
+      throw createError.badRequest('Maximum 100 personas can be duplicated at once');
+    }
+
+    const results = {
+      success: 0,
+      failed: 0,
+      personas: [] as Persona[],
+    };
+
+    for (const id of personaIds) {
+      try {
+        const result = await this.duplicatePersona(id, userId);
+        results.personas.push(result.persona);
+        results.success++;
+      } catch (error) {
+        results.failed++;
+      }
+    }
+
+    return results;
+  },
+
+  // ============================================
+  // Import Persona
+  // ============================================
+
+  async importPersona(
+    userId: string,
+    personaData: any,
+    avatarFile?: Express.Multer.File
+  ): Promise<PersonaResponse> {
+    // Validate required fields
+    if (!personaData.name || typeof personaData.name !== 'string') {
+      throw createError.badRequest('Persona name is required');
+    }
+
+    // Generate unique slug
+    const baseSlug = generateSlug(personaData.name);
+    let slug = baseSlug;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (await personaRepository.checkSlugExists(slug)) {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw createError.internal('Failed to generate unique slug');
+      }
+      slug = `${baseSlug}-${attempts}`;
+    }
+
+    // Process avatar file if provided
+    let avatar = personaData.avatar ? (typeof personaData.avatar === 'string' ? { url: personaData.avatar } : personaData.avatar) : null;
+
+    if (avatarFile) {
+      const processedImage = await processImageUpload(avatarFile, 'personas');
+      if (processedImage) {
+        avatar = processedImage;
+      }
+    }
+
+    // Map imported data to CreatePersonaData
+    const createData: CreatePersonaData = {
+      userId,
+      name: personaData.name,
+      slug,
+      description: personaData.description ?? null,
+      rating: personaData.rating ?? 'SFW',
+      visibility: personaData.visibility ?? 'private',
+      avatar,
+      backgroundImg: personaData.backgroundImg ? (typeof personaData.backgroundImg === 'string' ? { url: personaData.backgroundImg } : personaData.backgroundImg) : null,
+      tags: Array.isArray(personaData.tags) ? personaData.tags : [],
+      lorebookId: null, // Don't import relationships
+    };
+
+    const persona = await personaRepository.createPersona(createData);
+
+    // Fetch persona with relations
+    const personaWithRelations = await personaRepository.findPersonaById(persona.id);
+    if (!personaWithRelations) {
+      throw createError.notFound('Persona not found after import');
+    }
+
+    return { persona: personaWithRelations };
+  },
+
+  // ============================================
+  // Bulk Import Personas
+  // ============================================
+
+  async bulkImportPersonas(
+    userId: string,
+    personasData: any[]
+  ): Promise<{
+    success: number;
+    failed: number;
+    personas: Persona[];
+    errors: Array<{ name: string; error: string }>;
+  }> {
+    const results = {
+      success: 0,
+      failed: 0,
+      personas: [] as Persona[],
+      errors: [] as Array<{ name: string; error: string }>,
+    };
+
+    for (const personaData of personasData) {
+      try {
+        const result = await this.importPersona(userId, personaData);
+        results.success++;
+        results.personas.push(result.persona);
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push({
+          name: personaData.name || 'Unknown',
+          error: error.message || 'Unknown error occurred',
+        });
+      }
+    }
+
+    return results;
   },
 };
