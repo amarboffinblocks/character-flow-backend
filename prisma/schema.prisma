@@ -8,7 +8,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // URL is configured in prisma.config.ts (Prisma 7)
 }
 
 // ============================================
@@ -87,6 +87,7 @@ model User {
   lorebooks           Lorebook[]
   realms              Realm[]
   chats               Chat[]
+  folders             Folder[]
   backgrounds         Background[]
   subscriptionHistory SubscriptionHistory[]
   tokenTransactions   TokenTransaction[]
@@ -403,11 +404,37 @@ model Background {
 // Chat Model
 // ============================================
 
+// ============================================
+// Folder Model
+// ============================================
+
+model Folder {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  color       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chats Chat[]
+
+  @@index([userId])
+  @@map("folders")
+}
+
+// ============================================
+// Chat Model
+// ============================================
+
 model Chat {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
   characterId String?  @map("character_id")
   realmId     String?  @map("realm_id")
+  folderId    String?  @map("folder_id")
   title       String?
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -417,11 +444,13 @@ model Chat {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   character Character? @relation(fields: [characterId], references: [id], onDelete: Cascade)
   realm     Realm?     @relation(fields: [realmId], references: [id], onDelete: Cascade)
+  folder    Folder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
   messages  Message[]
 
   @@index([userId])
   @@index([characterId])
   @@index([realmId])
+  @@index([folderId])
   @@map("chats")
 }
 

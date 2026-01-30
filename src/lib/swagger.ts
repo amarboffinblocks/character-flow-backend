@@ -28,29 +28,29 @@ export const loadSwaggerSpec = (): any | null => {
     // Path to the Swagger YAML file (in project root)
     const projectRoot = getProjectRoot();
     const swaggerPath = join(projectRoot, 'API_SWAGGER.yaml');
-    
+
     logger.info({ swaggerPath }, 'Loading Swagger spec from');
-    
+
     // Check if file exists first
     if (!existsSync(swaggerPath)) {
       logger.warn({ swaggerPath }, 'Swagger file not found, Swagger UI will not be available');
       return null;
     }
-    
+
     const yamlContent = readFileSync(swaggerPath, 'utf-8');
-    
+
     if (!yamlContent || yamlContent.trim().length === 0) {
       logger.warn({ swaggerPath }, 'Swagger file is empty');
       return null;
     }
-    
+
     const swaggerSpec = loadYaml(yamlContent) as any;
-    
+
     if (!swaggerSpec) {
       logger.warn({ swaggerPath }, 'Failed to parse Swagger YAML');
       return null;
     }
-    
+
     logger.info('✅ Swagger spec loaded successfully');
     return swaggerSpec;
   } catch (error) {
@@ -107,7 +107,7 @@ export const setupSwagger = (app: Express): void => {
     // swaggerUi.serve returns an array of middleware functions
     const swaggerServe = swaggerUi.serve;
     const swaggerSetup = swaggerUi.setup(swaggerSpec, swaggerUiOptions);
-    
+
     // Use spread operator to apply all middleware from swaggerUi.serve
     app.use('/api-docs', ...swaggerServe);
     app.get('/api-docs', swaggerSetup);
@@ -122,20 +122,22 @@ export const setupSwagger = (app: Express): void => {
     app.get('/api-docs.yaml', (_req, res) => {
       const projectRoot = getProjectRoot();
       const swaggerPath = join(projectRoot, 'API_SWAGGER.yaml');
-      
+
       if (!existsSync(swaggerPath)) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: {
             code: 'NOT_FOUND',
             message: 'Swagger YAML file not found',
           },
         });
+        return;
       }
-      
+
       const yamlContent = readFileSync(swaggerPath, 'utf-8');
       res.setHeader('Content-Type', 'text/yaml');
       res.send(yamlContent);
+      return;
     });
 
     logger.info('✅ Swagger UI available at /api-docs');

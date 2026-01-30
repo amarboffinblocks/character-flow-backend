@@ -70,19 +70,8 @@ export const characterRepository = {
     const skip = limit === 0 ? undefined : (page - 1) * limit;
     const take = limit === 0 ? undefined : limit;
 
-    // Build where clause
-    const where: {
-      userId: string;
-      rating?: Rating;
-      visibility?: Visibility;
-      isFavourite?: boolean;
-      isSaved?: boolean;
-      tags?: { hasEvery: string[] } | { hasNone: string[] };
-      OR?: Array<{
-        name?: { contains: string; mode: 'insensitive' };
-        description?: { contains: string; mode: 'insensitive' };
-      }>;
-    } = {
+    // Build where clause (use Prisma type for NOT and tags)
+    const where: Prisma.CharacterWhereInput = {
       userId,
     };
 
@@ -107,9 +96,8 @@ export const characterRepository = {
     }
 
     if (excludeTags && excludeTags.length > 0) {
-      // Exclude characters that have any of these tags using NOT with hasSome
       where.NOT = [
-        { tags: { hasSome: excludeTags } }
+        { tags: { hasSome: excludeTags } },
       ];
     }
 
@@ -160,16 +148,8 @@ export const characterRepository = {
     const skip = limit === 0 ? undefined : (page - 1) * limit;
     const take = limit === 0 ? undefined : limit;
 
-    // Build where clause
-    const where: {
-      visibility: 'public';
-      rating?: Rating;
-      tags?: { hasEvery: string[] } | { hasNone: string[] } | { hasEvery: string[]; hasNone: string[] };
-      OR?: Array<{
-        name?: { contains: string; mode: 'insensitive' };
-        description?: { contains: string; mode: 'insensitive' };
-      }>;
-    } = {
+    // Build where clause (use Prisma type for NOT and tags)
+    const where: Prisma.CharacterWhereInput = {
       visibility: 'public',
     };
 
@@ -182,9 +162,8 @@ export const characterRepository = {
     }
 
     if (excludeTags && excludeTags.length > 0) {
-      // Exclude characters that have any of these tags using NOT with hasSome
       where.NOT = [
-        { tags: { hasSome: excludeTags } }
+        { tags: { hasSome: excludeTags } },
       ];
     }
 
@@ -279,18 +258,18 @@ export const characterRepository = {
     if (data.authorNotes !== undefined) updateData.authorNotes = data.authorNotes;
     if (data.characterNotes !== undefined) updateData.characterNotes = data.characterNotes;
     if (data.authorName !== undefined) updateData.authorName = data.authorName;
-    
-    // Handle relationship updates
+
+    // Handle relationship updates (use connect/disconnect for relations)
     if (data.personaId !== undefined) {
-      updateData.personaId = data.personaId ?? null;
+      updateData.persona = data.personaId ? { connect: { id: data.personaId } } : { disconnect: true };
     }
     if (data.lorebookId !== undefined) {
-      updateData.lorebookId = data.lorebookId ?? null;
+      updateData.lorebook = data.lorebookId ? { connect: { id: data.lorebookId } } : { disconnect: true };
     }
     if (data.realmId !== undefined) {
-      updateData.realmId = data.realmId ?? null;
+      updateData.realm = data.realmId ? { connect: { id: data.realmId } } : { disconnect: true };
     }
-    
+
     if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
     if (data.isSaved !== undefined) updateData.isSaved = data.isSaved;
 

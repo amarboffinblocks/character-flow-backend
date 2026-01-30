@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
-import type { Persona, Rating, Visibility, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { Persona, Rating, Visibility } from '@prisma/client';
 import type {
   CreatePersonaData,
   UpdatePersonaData,
@@ -288,8 +289,8 @@ export const personaRepository = {
         description: data.description,
         rating: data.rating,
         visibility: data.visibility,
-        avatar: data.avatar,
-        backgroundImg: data.backgroundImg,
+        ...(data.avatar !== undefined && { avatar: data.avatar != null ? (data.avatar as Prisma.InputJsonValue) : Prisma.JsonNull }),
+        ...(data.backgroundImg !== undefined && { backgroundImg: data.backgroundImg != null ? (data.backgroundImg as Prisma.InputJsonValue) : Prisma.JsonNull }),
         tags: data.tags,
         lorebookId: data.lorebookId,
       },
@@ -297,21 +298,24 @@ export const personaRepository = {
   },
 
   async updatePersona(id: string, data: UpdatePersonaData): Promise<Persona> {
+    const updateData: Prisma.PersonaUpdateInput = {};
+    if (data.name) updateData.name = data.name;
+    if (data.slug) updateData.slug = data.slug;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.rating) updateData.rating = data.rating;
+    if (data.visibility) updateData.visibility = data.visibility;
+    if (data.avatar !== undefined) updateData.avatar = data.avatar === null ? Prisma.JsonNull : (data.avatar as Prisma.InputJsonValue);
+    if (data.backgroundImg !== undefined) updateData.backgroundImg = data.backgroundImg === null ? Prisma.JsonNull : (data.backgroundImg as Prisma.InputJsonValue);
+    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.lorebookId !== undefined) {
+      updateData.lorebook = data.lorebookId ? { connect: { id: data.lorebookId } } : { disconnect: true };
+    }
+    if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
+    if (data.isSaved !== undefined) updateData.isSaved = data.isSaved;
+
     return prisma.persona.update({
       where: { id },
-      data: {
-        ...(data.name && { name: data.name }),
-        ...(data.slug && { slug: data.slug }),
-        ...(data.description !== undefined && { description: data.description }),
-        ...(data.rating && { rating: data.rating }),
-        ...(data.visibility && { visibility: data.visibility }),
-        ...(data.avatar !== undefined && { avatar: data.avatar }),
-        ...(data.backgroundImg !== undefined && { backgroundImg: data.backgroundImg }),
-        ...(data.tags !== undefined && { tags: data.tags }),
-        ...(data.lorebookId !== undefined && { lorebookId: data.lorebookId }),
-        ...(data.isFavourite !== undefined && { isFavourite: data.isFavourite }),
-        ...(data.isSaved !== undefined && { isSaved: data.isSaved }),
-      },
+      data: updateData,
     });
   },
 
