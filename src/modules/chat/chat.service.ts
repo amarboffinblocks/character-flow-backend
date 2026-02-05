@@ -1,6 +1,7 @@
 import { chatRepository } from './chat.repository.js';
 import { modelService } from '../model/index.js';
-
+import { modelRepository } from '../model/model.repository.js';
+import { createChatCompletion, type ChatMessage } from '../../lib/ai/agent.js';
 import { prisma } from '../../lib/prisma.js';
 import { createError } from '../../utils/index.js';
 import type {
@@ -186,11 +187,53 @@ export const chatService = {
   },
 
   // ============================================
-  // Send Message to LLM
+  // Send Message to LLM (Testing Only)
   // ============================================
 
-  async sendMessage(chatId: string, userId: string, input: CreateMessageInput) {
-   
+  async sendMessage(chatId: string, userId: string, input: CreateMessageInput): Promise<SendMessageResponse> {
+    // Get user message from input
+    const userMessage = input.content;
+
+    // Configure AI options (can be made dynamic later)
+    const aiOptions = {
+      provider: "gemini" as const,
+      modelName: "gemini-2.5-flash",
+      instructions: "You are a helpful AI assistant.",
+      temperature: 0.7,
+    };
+
+    // Build messages array
+    const messages: ChatMessage[] = [
+      {
+        role: "user",
+        content: userMessage,
+      },
+    ];
+
+    // Call LLM
+    const result = await createChatCompletion(aiOptions, messages);
+
+    // Return simple response for testing
+    return {
+      userMessage: {
+        id: "test-user-msg",
+        chatId: chatId,
+        role: "user",
+        content: userMessage,
+        tokensUsed: null,
+        metadata: null,
+        createdAt: new Date(),
+      },
+      assistantMessage: {
+        id: "test-assistant-msg",
+        chatId: chatId,
+        role: "assistant",
+        content: result.content,
+        tokensUsed: result.usage?.totalTokens || null,
+        metadata: { provider: aiOptions.provider },
+        createdAt: new Date(),
+      },
+    };
   },
 
   // ============================================

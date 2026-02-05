@@ -434,15 +434,11 @@ model Model {
   name        String
   slug        String   @unique
   description String?
-  provider    String   @default("aws") // "aws" | "openai" | "anthropic" | "custom"
-  baseUrl     String?  @map("base_url") // API base URL for the model
-  apiKey      String?  @map("api_key") // Encrypted API key if needed
-  modelName   String?  @map("model_name") // Specific model identifier (e.g., "gpt-4", "claude-3")
-  region      String? // AWS region if hosted on AWS
-  endpoint    String? // AWS endpoint URL if hosted on AWS
+  provider    ModelProvider @default(aws)
+  modelName   String?  @map("model_name")
   isActive    Boolean  @default(true) @map("is_active")
   isDefault   Boolean  @default(false) @map("is_default")
-  metadata    Json? // Additional configuration/metadata
+  metadata    Json?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -453,6 +449,14 @@ model Model {
   @@index([isActive])
   @@index([isDefault])
   @@map("models")
+}
+
+enum ModelProvider {
+  openai
+  gemini
+  aws
+  anthropic
+  local
 }
 
 // ============================================

@@ -12,6 +12,8 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
     if (!chatId) {
         throw new Error('Chat ID is required');
     }
+
+    console.log("req.body", req.body);
     const user = requireCurrentUser(req);
     const validated = createMessageSchema.parse(req.body);
 

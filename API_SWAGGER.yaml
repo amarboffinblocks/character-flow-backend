@@ -10,7 +10,14 @@ info:
     - Persona management
     - Lorebook management
     - Tag management
-    - Chat and message management with AI/LLM integration
+    - Chat and message management with **AI/LLM integration**
+    
+    **AI Integration:**
+    - Supports multiple AI providers: OpenAI, Google Gemini, and AWS-hosted LLMs
+    - Automatic conversation context management
+    - Token usage tracking
+    - Model selection and switching per chat
+    - Configurable via environment variables (OPENAI_API_KEY, GEMINI_API_KEY, AWS_LLM_BASE_URL)
     
     **Base URL:** `http://localhost:8000/api/v1` (Development)
     
@@ -39,6 +46,8 @@ tags:
     description: Lorebook management
   - name: Tags
     description: Tag management
+  - name: Models
+    description: AI model management (Admin only for creation)
   - name: Chats
     description: Chat and message management with AI/LLM
 paths:
@@ -1102,6 +1111,185 @@ paths:
         '200':
           description: Popular tags retrieved successfully
 
+  /models:
+    get:
+      tags:
+        - Models
+      summary: List All Models
+      description: |
+        Get list of all available AI models. Can filter by active status.
+        
+        **Note:** This endpoint is public and does not require authentication.
+      parameters:
+        - name: isActive
+          in: query
+          description: Filter by active status (accepts "true", "false", "1", or "0" as strings)
+          schema:
+            type: string
+            enum: ["true", "false", "1", "0"]
+          example: "true"
+      responses:
+        '200':
+          description: Models retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelListResponse'
+              examples:
+                allModels:
+                  value:
+                    success: true
+                    data:
+                      models:
+                        - id: "123e4567-e89b-12d3-a456-426614174000"
+                          name: "GPT-4o Mini"
+                          slug: "gpt-4o-mini"
+                          description: "OpenAI GPT-4o Mini model"
+                          provider: "openai"
+                          modelName: "gpt-4o-mini"
+                          isActive: true
+                          isDefault: true
+                          createdAt: "2024-01-15T10:00:00Z"
+                          updatedAt: "2024-01-15T10:00:00Z"
+                    message: "Models retrieved successfully"
+    post:
+      tags:
+        - Models
+      summary: Create Model (Admin Only)
+      description: |
+        Create a new AI model configuration. **Admin access required.**
+        
+        **Supported Providers:**
+        - `openai`: OpenAI models (GPT-4, GPT-3.5, etc.)
+        - `gemini`: Google Gemini models
+        - `aws`: AWS-hosted LLM endpoints
+        - `anthropic`: Anthropic Claude models
+        - `local`: Local/self-hosted models
+        
+        **Slug Requirements:**
+        - Must be unique
+        - Lowercase letters, numbers, and hyphens only
+        - Used as identifier in API calls
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModelRequest'
+            examples:
+              openai:
+                summary: "OpenAI Model Example"
+                value:
+                  name: "GPT-4o Mini"
+                  slug: "gpt-4o-mini"
+                  description: "OpenAI GPT-4o Mini model"
+                  provider: "openai"
+                  modelName: "gpt-4o-mini"
+                  isActive: true
+                  isDefault: false
+              gemini:
+                value:
+                  name: "Gemini 1.5 Flash"
+                  slug: "gemini-1-5-flash"
+                  description: "Google Gemini 1.5 Flash model"
+                  provider: "gemini"
+                  modelName: "gemini-1.5-flash"
+                  isActive: true
+                  isDefault: false
+              aws:
+                value:
+                  name: "AWS Bedrock Model"
+                  slug: "aws-bedrock-model"
+                  description: "AWS Bedrock hosted LLM"
+                  provider: "aws"
+                  modelName: "anthropic.claude-3-sonnet-20240229-v1:0"
+                  isActive: true
+                  isDefault: false
+              local:
+                value:
+                  name: "Local Self-Hosted Model"
+                  slug: "local-model"
+                  description: "Local self-hosted LLM"
+                  provider: "local"
+                  modelName: "local-llm-v1"
+                  isActive: true
+                  isDefault: false
+      responses:
+        '201':
+          description: Model created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelResponse'
+              example:
+                success: true
+                data:
+                  model:
+                    id: "123e4567-e89b-12d3-a456-426614174000"
+                    name: "GPT-4o Mini"
+                    slug: "gpt-4o-mini"
+                    description: "OpenAI GPT-4o Mini model"
+                    provider: "openai"
+                    modelName: "gpt-4o-mini"
+                    isActive: true
+                    isDefault: false
+                    createdAt: "2024-01-15T10:00:00Z"
+                    updatedAt: "2024-01-15T10:00:00Z"
+                message: "Model created successfully"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /models/{id}:
+    get:
+      tags:
+        - Models
+      summary: Get Model by ID
+      description: |
+        Get details of a specific AI model by its ID.
+        
+        **Note:** This endpoint is public and does not require authentication.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Model UUID
+          schema:
+            type: string
+            format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '200':
+          description: Model retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelResponse'
+              example:
+                success: true
+                data:
+                  model:
+                    id: "123e4567-e89b-12d3-a456-426614174000"
+                    name: "GPT-4o Mini"
+                    slug: "gpt-4o-mini"
+                    description: "OpenAI GPT-4o Mini model"
+                    provider: "openai"
+                    modelName: "gpt-4o-mini"
+                    isActive: true
+                    isDefault: true
+                    createdAt: "2024-01-15T10:00:00Z"
+                    updatedAt: "2024-01-15T10:00:00Z"
+                message: "Model retrieved successfully"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /chats:
     get:
       tags:
@@ -1348,15 +1536,34 @@ paths:
     post:
       tags:
         - Chats
-      summary: Send Message to LLM
+      summary: Send Message to AI/LLM
       description: |
         Send a message to the AI/LLM and receive a response. The chat must have a model selected.
         
-        **Features:**
-        - Automatically includes last 50 messages as context
-        - If AI service fails, the user message is rolled back
-        - Updates chat's updatedAt timestamp
-        - Returns both user and assistant messages
+        **AI Integration Features:**
+        - Supports multiple AI providers (OpenAI, Gemini, AWS-hosted LLMs)
+        - Automatically includes full conversation history as context
+        - Maintains conversation context across messages
+        - Token usage tracking for each message
+        - Model configuration from database (provider, model name)
+        
+        **How it works:**
+        1. Validates chat ownership and model selection
+        2. Retrieves conversation history from database
+        3. Saves user message to database
+        4. Calls AI provider with conversation context
+        5. Saves assistant response with token usage
+        6. Returns both user and assistant messages
+        
+        **Requirements:**
+        - Chat must have a model selected (modelId)
+        - Model must be active in the system
+        - Appropriate API keys must be configured (OPENAI_API_KEY, GEMINI_API_KEY, or AWS_LLM_BASE_URL)
+        
+        **Error Handling:**
+        - If AI service fails, user message is still saved
+        - Returns user-friendly error messages
+        - Validates message role (user, assistant, or system)
       parameters:
         - name: id
           in: path
@@ -1372,15 +1579,66 @@ paths:
               $ref: '#/components/schemas/CreateMessageRequest'
       responses:
         '201':
-          description: Message sent successfully
+          description: Message sent successfully and AI response received
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SendMessageResponse'
+              example:
+                success: true
+                data:
+                  userMessage:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    chatId: "123e4567-e89b-12d3-a456-426614174000"
+                    role: "user"
+                    content: "Hello, how are you?"
+                    tokensUsed: null
+                    metadata: null
+                    createdAt: "2024-01-15T10:30:00Z"
+                  assistantMessage:
+                    id: "660e8400-e29b-41d4-a716-446655440001"
+                    chatId: "123e4567-e89b-12d3-a456-426614174000"
+                    role: "assistant"
+                    content: "Hello! I'm doing well, thank you for asking. How can I help you today?"
+                    tokensUsed: 25
+                    metadata:
+                      model: "gpt-4o-mini"
+                      provider: "openai"
+                    createdAt: "2024-01-15T10:30:05Z"
+                message: "Message sent successfully"
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Bad request - Invalid input or model not available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noModel:
+                  value:
+                    success: false
+                    error:
+                      code: "BAD_REQUEST"
+                      message: "A model must be selected before sending messages. Please select a model for this chat."
+                invalidRole:
+                  value:
+                    success: false
+                    error:
+                      code: "BAD_REQUEST"
+                      message: "Invalid message role. Must be \"user\", \"assistant\", or \"system\"."
+                aiServiceError:
+                  value:
+                    success: false
+                    error:
+                      code: "EXTERNAL_SERVICE_ERROR"
+                      message: "Failed to get response from AI. Please try again later."
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          description: Internal server error or AI service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   securitySchemes:
@@ -1494,6 +1752,17 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden - Insufficient permissions (e.g., admin access required)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: "FORBIDDEN"
+              message: "Admin access required"
 
   schemas:
     Error:
@@ -1511,6 +1780,29 @@ components:
             message:
               type: string
               example: Resource not found
+
+    ErrorResponse:
+      type: object
+      description: Standard error response format
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Error code (e.g., BAD_REQUEST, NOT_FOUND, EXTERNAL_SERVICE_ERROR)
+              example: BAD_REQUEST
+            message:
+              type: string
+              description: Human-readable error message
+              example: A model must be selected before sending messages
+            details:
+              type: object
+              nullable: true
+              description: Additional error details (optional)
 
     Success:
       type: object
@@ -1973,12 +2265,21 @@ components:
           type: string
           minLength: 1
           maxLength: 10000
-          description: Message content
+          description: |
+            Message content to send to the AI.
+            
+            **Note:** The AI will use the full conversation history as context,
+            so you can reference previous messages naturally.
+          example: "What is the capital of France?"
         role:
           type: string
           enum: [user, assistant, system]
           default: user
-          description: Message role (optional, defaults to 'user')
+          description: |
+            Message role. 
+            - `user`: User message (default)
+            - `assistant`: Assistant/AI message (for manual insertion)
+            - `system`: System message (for instructions/context)
 
     Message:
       type: object
@@ -1986,26 +2287,43 @@ components:
         id:
           type: string
           format: uuid
+          description: Unique message identifier
         chatId:
           type: string
           format: uuid
+          description: ID of the chat this message belongs to
         role:
           type: string
           enum: [user, assistant, system]
+          description: Message role (user, assistant, or system)
         content:
           type: string
+          description: Message content
         tokensUsed:
           type: integer
           nullable: true
+          description: |
+            Number of tokens used for this message (for AI responses).
+            Includes both prompt and completion tokens.
+            Null for user messages or if token usage is not available.
         metadata:
           type: object
           nullable: true
+          description: |
+            Additional metadata about the message.
+            For AI responses, includes:
+            - `model`: Model name used (e.g., "gpt-4o-mini")
+            - `provider`: AI provider (e.g., "openai", "gemini", "aws")
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the message was created
 
     SendMessageResponse:
       type: object
+      description: |
+        Response containing both the user message and the AI assistant's response.
+        Both messages are saved to the database and returned together.
       properties:
         success:
           type: boolean
@@ -2015,8 +2333,12 @@ components:
           properties:
             userMessage:
               $ref: '#/components/schemas/Message'
+              description: The user's message that was sent
             assistantMessage:
               $ref: '#/components/schemas/Message'
+              description: |
+                The AI assistant's response.
+                Includes token usage and model metadata.
         message:
           type: string
           example: Message sent successfully
@@ -2048,6 +2370,142 @@ components:
         message:
           type: string
           example: Messages retrieved successfully
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique model identifier
+        name:
+          type: string
+          description: Display name of the model
+          example: "GPT-4o Mini"
+        slug:
+          type: string
+          description: URL-friendly identifier (unique)
+          example: "gpt-4o-mini"
+        description:
+          type: string
+          nullable: true
+          description: Model description
+        provider:
+          type: string
+          description: AI provider
+          enum: [openai, gemini, aws, anthropic, local]
+          example: "openai"
+        modelName:
+          type: string
+          nullable: true
+          description: Specific model identifier (e.g., "gpt-4o-mini", "gemini-1.5-flash")
+          example: "gpt-4o-mini"
+        isActive:
+          type: boolean
+          description: Whether the model is active and available
+          default: true
+        isDefault:
+          type: boolean
+          description: Whether this is the default model
+          default: false
+        metadata:
+          type: object
+          nullable: true
+          description: Additional configuration/metadata
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the model was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the model was last updated
+
+    CreateModelRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Display name of the model
+          example: "GPT-4o Mini"
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: '^[a-z0-9-]+$'
+          description: |
+            URL-friendly identifier. Must be unique.
+            Only lowercase letters, numbers, and hyphens allowed.
+          example: "gpt-4o-mini"
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Model description
+          example: "OpenAI GPT-4o Mini model"
+        provider:
+          type: string
+          enum: [openai, gemini, aws, anthropic, local]
+          default: aws
+          description: AI provider
+          example: "openai"
+        modelName:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: Specific model identifier (e.g., "gpt-4o-mini", "gemini-1.5-flash")
+          example: "gpt-4o-mini"
+        isActive:
+          type: boolean
+          default: true
+          description: Whether the model should be active and available for use
+        isDefault:
+          type: boolean
+          default: false
+          description: Whether this should be the default model for new chats
+        metadata:
+          type: object
+          nullable: true
+          description: Additional configuration/metadata as JSON object. Optional.
+          additionalProperties: true
+
+    ModelResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            model:
+              $ref: '#/components/schemas/Model'
+        message:
+          type: string
+          example: Model retrieved successfully
+
+    ModelListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            models:
+              type: array
+              items:
+                $ref: '#/components/schemas/Model'
+        message:
+          type: string
+          example: Models retrieved successfully
 
 security:
   - bearerAuth: []

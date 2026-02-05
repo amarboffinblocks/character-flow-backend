@@ -4,6 +4,7 @@ import type {
   ModelResponse,
   ModelListResponse,
   ModelQueryParams,
+  CreateModelInput,
 } from './model.types.js';
 
 // ============================================
@@ -48,5 +49,16 @@ export const modelService = {
     if (!model.isActive) {
       throw createError.badRequest('Model is not active');
     }
+  },
+
+  async createModel(input: CreateModelInput): Promise<ModelResponse> {
+    // Check if slug already exists
+    const existing = await modelRepository.findModelBySlug(input.slug);
+    if (existing) {
+      throw createError.conflict(`Model with slug "${input.slug}" already exists`);
+    }
+
+    const model = await modelRepository.createModel(input);
+    return { model };
   },
 };
