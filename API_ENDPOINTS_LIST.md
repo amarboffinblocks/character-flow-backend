@@ -16,6 +16,7 @@ Complete list of all implemented API endpoints organized by module.
 4. [Persona Module](#4-persona-module)
 5. [Lorebook Module](#5-lorebook-module)
 6. [Tags Module](#6-tags-module)
+7. [Chat Module](#7-chat-module)
 
 ---
 
@@ -611,6 +612,169 @@ Complete list of all implemented API endpoints organized by module.
 
 ---
 
+## 7. Chat Module
+
+### 7.1 List Chats
+- **Method:** `GET`
+- **Endpoint:** `/api/v1/chats`
+- **Auth Required:** Yes
+- **Description:** Get paginated list of user's chats.
+- **Query Parameters:**
+  - `page` (integer, default: 1)
+  - `limit` (integer, default: 20, max: 100)
+  - `characterId` (string, UUID)
+  - `realmId` (string, UUID)
+  - `folderId` (string, UUID)
+  - `sortBy` (createdAt | updatedAt, default: updatedAt)
+  - `sortOrder` (asc | desc, default: desc)
+
+### 7.2 Create Chat
+- **Method:** `POST`
+- **Endpoint:** `/api/v1/chats`
+- **Auth Required:** Yes
+- **Description:** Create a new chat with a selected AI model.
+- **Request Body:**
+  ```json
+  {
+    "characterId": "uuid",  // Optional
+    "realmId": "uuid",       // Optional
+    "folderId": "uuid",      // Optional
+    "modelId": "uuid",       // Required - AI model for this chat
+    "title": "Chat Title"    // Optional
+  }
+  ```
+
+### 7.3 Get Chat
+- **Method:** `GET`
+- **Endpoint:** `/api/v1/chats/:id`
+- **Auth Required:** Yes
+- **Description:** Get chat details by ID.
+- **Query Parameters:**
+  - `messages` (string, "1" or "true") - Include messages in response
+
+### 7.4 Update Chat
+- **Method:** `PATCH`
+- **Endpoint:** `/api/v1/chats/:id`
+- **Auth Required:** Yes
+- **Description:** Update chat title, folder, or model.
+- **Request Body:**
+  ```json
+  {
+    "title": "Updated Title",  // Optional
+    "folderId": "uuid",         // Optional
+    "modelId": "uuid"           // Optional - Switch AI model
+  }
+  ```
+
+### 7.5 Delete Chat
+- **Method:** `DELETE`
+- **Endpoint:** `/api/v1/chats/:id`
+- **Auth Required:** Yes
+- **Description:** Permanently delete a chat and all its messages.
+
+### 7.6 Archive/Unarchive Chat
+- **Method:** `POST`
+- **Endpoint:** `/api/v1/chats/:id/archive`
+- **Auth Required:** Yes
+- **Description:** Toggle chat archive status (isActive). Archived chats are hidden from default views.
+
+### 7.7 Pin/Unpin Chat
+- **Method:** `POST`
+- **Endpoint:** `/api/v1/chats/:id/pin`
+- **Auth Required:** Yes
+- **Description:** Toggle chat pin status. Pinned chats appear at the top of the list.
+
+### 7.8 Duplicate Chat
+- **Method:** `POST`
+- **Endpoint:** `/api/v1/chats/:id/duplicate`
+- **Auth Required:** Yes
+- **Description:** Create a copy of a chat with all its messages. The new chat will have "(Copy)" appended to the title.
+
+### 7.9 Send Message to LLM
+- **Method:** `POST`
+- **Endpoint:** `/api/v1/chats/:id/messages`
+- **Auth Required:** Yes
+- **Description:** Send a message to the AI/LLM and receive a response. The chat must have a model selected.
+- **Request Body:**
+  ```json
+  {
+    "content": "Hello, how are you?",
+    "role": "user"  // Optional: "user" | "assistant" | "system", default: "user"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "userMessage": {
+        "id": "uuid",
+        "chatId": "uuid",
+        "role": "user",
+        "content": "Hello, how are you?",
+        "tokensUsed": null,
+        "metadata": null,
+        "createdAt": "2025-01-XX..."
+      },
+      "assistantMessage": {
+        "id": "uuid",
+        "chatId": "uuid",
+        "role": "assistant",
+        "content": "AI response here...",
+        "tokensUsed": 150,
+        "metadata": {...},
+        "createdAt": "2025-01-XX..."
+      }
+    },
+    "message": "Message sent successfully"
+  }
+  ```
+- **Notes:**
+  - Requires the chat to have a `modelId` selected
+  - Automatically includes last 50 messages as context
+  - If AI service fails, the user message is rolled back
+  - Updates chat's `updatedAt` timestamp
+
+### 7.10 List Messages
+- **Method:** `GET`
+- **Endpoint:** `/api/v1/chats/:id/messages`
+- **Auth Required:** Yes
+- **Description:** Get paginated list of messages in a chat.
+- **Query Parameters:**
+  - `page` (integer, default: 1)
+  - `limit` (integer, default: 20, max: 100)
+  - `role` (string, "user" | "assistant" | "system") - Filter by message role
+  - `sortBy` (string, default: "createdAt")
+  - `sortOrder` (string, "asc" | "desc", default: "asc")
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "messages": [
+        {
+          "id": "uuid",
+          "chatId": "uuid",
+          "role": "user",
+          "content": "Message content",
+          "tokensUsed": null,
+          "metadata": null,
+          "createdAt": "2025-01-XX..."
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 50,
+        "totalPages": 3
+      }
+    },
+    "message": "Messages retrieved successfully"
+  }
+  ```
+
+---
+
 ## Summary
 
 ### Total Endpoints by Module
@@ -623,14 +787,16 @@ Complete list of all implemented API endpoints organized by module.
 | **Persona** | 8 |
 | **Lorebook** | 13 |
 | **Tags** | 6 |
-| **TOTAL** | **57** |
+| **Chat** | 10 |
+| **TOTAL** | **67** |
 
 ### Endpoint Types Breakdown
 
-- **GET:** 24 endpoints
-- **POST:** 24 endpoints
+- **GET:** 26 endpoints
+- **POST:** 28 endpoints
 - **PUT:** 6 endpoints
-- **DELETE:** 3 endpoints
+- **PATCH:** 1 endpoint
+- **DELETE:** 4 endpoints
 
 ### Common Features Across Modules
 

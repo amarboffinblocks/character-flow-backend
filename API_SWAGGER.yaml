@@ -10,6 +10,7 @@ info:
     - Persona management
     - Lorebook management
     - Tag management
+    - Chat and message management with AI/LLM integration
     
     **Base URL:** `http://localhost:8000/api/v1` (Development)
     
@@ -38,6 +39,8 @@ tags:
     description: Lorebook management
   - name: Tags
     description: Tag management
+  - name: Chats
+    description: Chat and message management with AI/LLM
 paths:
   /auth/register:
     post:
@@ -1099,6 +1102,286 @@ paths:
         '200':
           description: Popular tags retrieved successfully
 
+  /chats:
+    get:
+      tags:
+        - Chats
+      summary: List Chats
+      description: Get paginated list of user's chats.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: characterId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: realmId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: folderId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, updatedAt]
+            default: updatedAt
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Chats retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatListResponse'
+    post:
+      tags:
+        - Chats
+      summary: Create Chat
+      description: Create a new chat with a selected AI model.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatRequest'
+      responses:
+        '201':
+          description: Chat created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /chats/{id}:
+    get:
+      tags:
+        - Chats
+      summary: Get Chat
+      description: Get chat details by ID. Optionally include messages.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: messages
+          in: query
+          description: Include messages in response
+          schema:
+            type: string
+            enum: ['1', 'true']
+      responses:
+        '200':
+          description: Chat retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Chats
+      summary: Update Chat
+      description: Update chat title, folder, or model.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChatRequest'
+      responses:
+        '200':
+          description: Chat updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Chats
+      summary: Delete Chat
+      description: Permanently delete a chat and all its messages.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Chat deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /chats/{id}/archive:
+    post:
+      tags:
+        - Chats
+      summary: Archive/Unarchive Chat
+      description: Toggle chat archive status. Archived chats are hidden from default views.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Chat archive status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /chats/{id}/pin:
+    post:
+      tags:
+        - Chats
+      summary: Pin/Unpin Chat
+      description: Toggle chat pin status. Pinned chats appear at the top of the list.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Chat pin status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /chats/{id}/duplicate:
+    post:
+      tags:
+        - Chats
+      summary: Duplicate Chat
+      description: Create a copy of a chat with all its messages. The new chat will have "(Copy)" appended to the title.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Chat duplicated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /chats/{id}/messages:
+    get:
+      tags:
+        - Chats
+      summary: List Messages
+      description: Get paginated list of messages in a chat.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: role
+          in: query
+          description: Filter by message role
+          schema:
+            type: string
+            enum: [user, assistant, system]
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt]
+            default: createdAt
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Chats
+      summary: Send Message to LLM
+      description: |
+        Send a message to the AI/LLM and receive a response. The chat must have a model selected.
+        
+        **Features:**
+        - Automatically includes last 50 messages as context
+        - If AI service fails, the user message is rolled back
+        - Updates chat's updatedAt timestamp
+        - Returns both user and assistant messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '201':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1550,6 +1833,221 @@ components:
         priority:
           type: integer
           default: 0
+
+    CreateChatRequest:
+      type: object
+      required:
+        - modelId
+      properties:
+        characterId:
+          type: string
+          format: uuid
+          nullable: true
+        realmId:
+          type: string
+          format: uuid
+          nullable: true
+        folderId:
+          type: string
+          format: uuid
+          nullable: true
+        modelId:
+          type: string
+          format: uuid
+          description: Required - AI model for this chat
+        title:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    UpdateChatRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 500
+          nullable: true
+        folderId:
+          type: string
+          format: uuid
+          nullable: true
+        modelId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Switch AI model for existing chat
+
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        characterId:
+          type: string
+          format: uuid
+          nullable: true
+        realmId:
+          type: string
+          format: uuid
+          nullable: true
+        folderId:
+          type: string
+          format: uuid
+          nullable: true
+        modelId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+          default: true
+        isPinned:
+          type: boolean
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        messageCount:
+          type: integer
+          description: Number of messages in the chat
+
+    ChatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            chat:
+              $ref: '#/components/schemas/Chat'
+        message:
+          type: string
+          example: Chat retrieved successfully
+
+    ChatListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            chats:
+              type: array
+              items:
+                $ref: '#/components/schemas/Chat'
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total:
+                  type: integer
+                totalPages:
+                  type: integer
+        message:
+          type: string
+          example: Chats retrieved successfully
+
+    CreateMessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Message content
+        role:
+          type: string
+          enum: [user, assistant, system]
+          default: user
+          description: Message role (optional, defaults to 'user')
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        chatId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        tokensUsed:
+          type: integer
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    SendMessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            userMessage:
+              $ref: '#/components/schemas/Message'
+            assistantMessage:
+              $ref: '#/components/schemas/Message'
+        message:
+          type: string
+          example: Message sent successfully
+
+    MessageListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: '#/components/schemas/Message'
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total:
+                  type: integer
+                totalPages:
+                  type: integer
+        message:
+          type: string
+          example: Messages retrieved successfully
 
 security:
   - bearerAuth: []

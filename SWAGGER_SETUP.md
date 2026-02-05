@@ -53,8 +53,9 @@ All completed modules are documented:
 - ✅ **Persona Module** (8 endpoints)
 - ✅ **Lorebook Module** (13 endpoints)
 - ✅ **Tags Module** (6 endpoints)
+- ✅ **Chat Module** (10 endpoints)
 
-**Total: 57 API endpoints**
+**Total: 67 API endpoints**
 
 ## 🎨 Features
 

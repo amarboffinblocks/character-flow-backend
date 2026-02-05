@@ -426,6 +426,36 @@ model Folder {
 }
 
 // ============================================
+// Model Model (AI Models)
+// ============================================
+
+model Model {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  provider    String   @default("aws") // "aws" | "openai" | "anthropic" | "custom"
+  baseUrl     String?  @map("base_url") // API base URL for the model
+  apiKey      String?  @map("api_key") // Encrypted API key if needed
+  modelName   String?  @map("model_name") // Specific model identifier (e.g., "gpt-4", "claude-3")
+  region      String? // AWS region if hosted on AWS
+  endpoint    String? // AWS endpoint URL if hosted on AWS
+  isActive    Boolean  @default(true) @map("is_active")
+  isDefault   Boolean  @default(false) @map("is_default")
+  metadata    Json? // Additional configuration/metadata
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  chats Chat[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([isDefault])
+  @@map("models")
+}
+
+// ============================================
 // Chat Model
 // ============================================
 
@@ -435,8 +465,10 @@ model Chat {
   characterId String?  @map("character_id")
   realmId     String?  @map("realm_id")
   folderId    String?  @map("folder_id")
+  modelId     String?  @map("model_id") // User-selected AI model for this chat (references Model.id)
   title       String?
   isActive    Boolean  @default(true) @map("is_active")
+  isPinned    Boolean  @default(false) @map("is_pinned")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -445,12 +477,14 @@ model Chat {
   character Character? @relation(fields: [characterId], references: [id], onDelete: Cascade)
   realm     Realm?     @relation(fields: [realmId], references: [id], onDelete: Cascade)
   folder    Folder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  model     Model?     @relation(fields: [modelId], references: [id], onDelete: SetNull)
   messages  Message[]
 
   @@index([userId])
   @@index([characterId])
   @@index([realmId])
   @@index([folderId])
+  @@index([modelId])
   @@map("chats")
 }
 
