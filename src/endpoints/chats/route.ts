@@ -22,11 +22,11 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
   const user = requireCurrentUser(req);
   const validated = createChatSchema.parse(req.body);
   const result = await chatService.createChat(user.id, {
-    characterId: validated.characterId ?? undefined,
-    realmId: validated.realmId ?? undefined,
-    folderId: validated.folderId ?? undefined,
-    modelId: validated.modelId,
-    title: validated.title ?? undefined,
+    characterId: validated.characterId ?? null,
+    realmId: validated.realmId ?? null,
+    folderId: validated.folderId ?? null,
+    modelId: validated.modelId ?? null,
+    title: validated.title ?? null,
   });
   sendSuccess(res, result, 'Chat created successfully', 201);
 };

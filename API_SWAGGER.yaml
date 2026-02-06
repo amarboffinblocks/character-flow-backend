@@ -1332,13 +1332,42 @@ paths:
       tags:
         - Chats
       summary: Create Chat
-      description: Create a new chat with a selected AI model.
+      description: |
+        Create a new chat. All fields are optional except that at least one identifier should be provided.
+        
+        **Model Selection:**
+        - If `modelId` is provided, that model will be used for the chat
+        - If `modelId` is not provided, the default model will be automatically assigned
+        - The default model must be configured in the system
+        
+        **Optional Fields:**
+        - `realmId`: Optional - Link chat to a realm
+        - `folderId`: Optional - Organize chat in a folder
+        - `characterId`: Optional - Associate chat with a character
+        - `title`: Optional - Custom chat title
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateChatRequest'
+            examples:
+              withModel:
+                summary: "Create chat with specific model"
+                value:
+                  modelId: "123e4567-e89b-12d3-a456-426614174000"
+                  title: "My Chat"
+                  realmId: "123e4567-e89b-12d3-a456-426614174001"
+                  folderId: "123e4567-e89b-12d3-a456-426614174002"
+              withDefaultModel:
+                summary: "Create chat using default model"
+                value:
+                  title: "My Chat"
+                  realmId: "123e4567-e89b-12d3-a456-426614174001"
+              minimal:
+                summary: "Minimal chat creation"
+                value:
+                  title: "New Chat"
       responses:
         '201':
           description: Chat created successfully
@@ -2128,29 +2157,35 @@ components:
 
     CreateChatRequest:
       type: object
-      required:
-        - modelId
       properties:
         characterId:
           type: string
           format: uuid
           nullable: true
+          description: Optional - Associate chat with a character
         realmId:
           type: string
           format: uuid
           nullable: true
+          description: Optional - Link chat to a realm
         folderId:
           type: string
           format: uuid
           nullable: true
+          description: Optional - Organize chat in a folder
         modelId:
           type: string
           format: uuid
-          description: Required - AI model for this chat
+          nullable: true
+          description: |
+            Optional - AI model for this chat.
+            If not provided, the default model will be automatically assigned.
+            The default model must be configured in the system.
         title:
           type: string
           maxLength: 500
           nullable: true
+          description: Optional - Custom chat title
 
     UpdateChatRequest:
       type: object

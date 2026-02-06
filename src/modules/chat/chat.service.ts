@@ -55,15 +55,26 @@ export const chatService = {
   },
 
   async createChat(userId: string, input: CreateChatInput): Promise<ChatResponse> {
-    // Validate that the model exists and is active
-    await modelService.validateModelExists(input.modelId);
+    // Validate model if provided, otherwise use default model
+    let modelId = input.modelId;
+
+    if (modelId) {
+      await modelService.validateModelExists(modelId);
+    } else {
+      // Use default model if no modelId provided
+      const defaultModel = await modelRepository.findDefaultModel();
+      if (!defaultModel || !defaultModel.isActive) {
+        throw createError.badRequest('No active model available. Please select a model or ensure a default model is configured.');
+      }
+      modelId = defaultModel.id;
+    }
 
     const data: CreateChatData = {
       userId,
       characterId: input.characterId ?? null,
       realmId: input.realmId ?? null,
       folderId: input.folderId ?? null,
-      modelId: input.modelId,
+      modelId: modelId,
       title: input.title ?? null,
     };
     const chat = await chatRepository.createChat(data);
@@ -187,17 +198,37 @@ export const chatService = {
   },
 
   // ============================================
-  // Send Message to LLM (Testing Only)
+  // Send Message to LLM
   // ============================================
 
   async sendMessage(chatId: string, userId: string, input: CreateMessageInput): Promise<SendMessageResponse> {
+    // Get chat
+    const chat = await chatRepository.findChatByIdAndUser(chatId, userId);
+    if (!chat) {
+      throw createError.notFound('Chat not found');
+    }
+
+    // Get modelId from chat or use default model
+    let modelId = (chat as { modelId?: string | null }).modelId;
+    let model = modelId ? await modelRepository.findModelById(modelId) : null;
+
+    // If no model selected or model not available, use default model
+    if (!modelId || !model || !model.isActive) {
+      const defaultModel = await modelRepository.findDefaultModel();
+      if (!defaultModel || !defaultModel.isActive) {
+        throw createError.badRequest('No active model available. Please select a model or ensure a default model is configured.');
+      }
+      model = defaultModel;
+      modelId = defaultModel.id;
+    }
+
     // Get user message from input
     const userMessage = input.content;
 
-    // Configure AI options (can be made dynamic later)
+    // Configure AI options from model
     const aiOptions = {
-      provider: "gemini" as const,
-      modelName: "gemini-2.5-flash",
+      provider: model.provider as "openai" | "gemini" | "aws" | "anthropic" | "local",
+      modelName: model.modelName || "gemini-2.5-flash",
       instructions: "You are a helpful AI assistant.",
       temperature: 0.7,
     };
@@ -213,7 +244,7 @@ export const chatService = {
     // Call LLM
     const result = await createChatCompletion(aiOptions, messages);
 
-    // Return simple response for testing
+    // Return response
     return {
       userMessage: {
         id: "test-user-msg",
@@ -230,7 +261,7 @@ export const chatService = {
         role: "assistant",
         content: result.content,
         tokensUsed: result.usage?.totalTokens || null,
-        metadata: { provider: aiOptions.provider },
+        metadata: { provider: aiOptions.provider, modelId: model.id },
         createdAt: new Date(),
       },
     };

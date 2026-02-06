@@ -8,7 +8,10 @@ export const modelQuerySchema = z.object({
   isActive: z
     .string()
     .optional()
-    .transform((val) => val === 'true' || val === '1'),
+    .transform((val) => {
+      if (val === undefined || val === null) return undefined;
+      return val === 'true' || val === '1';
+    }),
 });
 
 export const createModelSchema = z.object({

@@ -5,7 +5,7 @@ import { openaiClient, geminiClient, awsClient } from "./providers.js";
 // Model Provider Types
 // ============================================
 
-export type ModelProvider = "openai" | "gemini" | "aws";
+export type ModelProvider = "openai" | "gemini" | "aws" | "anthropic" | "local";
 
 // ============================================
 // Provider to Client Mapping
@@ -15,6 +15,8 @@ const providerClientMap = new Map<ModelProvider, OpenAI>([
     ["openai", openaiClient],
     ["gemini", geminiClient],
     ["aws", awsClient],
+    ["anthropic", awsClient], // Use AWS client as fallback for anthropic
+    ["local", awsClient], // Use AWS client as fallback for local
 ]);
 
 // ============================================

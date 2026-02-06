@@ -3823,6 +3823,142 @@ The authentication system uses **Two-Factor Authentication (2FA)** with OTP (One
 
 ---
 
+## Model Endpoints
+
+### 106. List All Models
+- **Method:** `GET`
+- **Endpoint:** `/api/v1/models`
+- **Auth Required:** No
+- **Query Parameters:**
+  - `isActive` (optional): Filter by active status. Accepts `"true"`, `"false"`, `"1"`, or `"0"` as strings.
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "models": [
+      {
+        "id": "2ce1e3e8-cf21-4123-ae90-5058ad94268b",
+        "name": "GPT-4o Mini",
+        "slug": "gpt-4o-mini",
+        "description": "OpenAI GPT-4o Mini model",
+        "provider": "openai",
+        "modelName": "gpt-4o-mini",
+        "isActive": true,
+        "isDefault": false,
+        "metadata": null,
+        "createdAt": "2026-02-05T12:55:27.391Z",
+        "updatedAt": "2026-02-05T12:55:27.391Z"
+      }
+    ]
+  },
+  "message": "Models retrieved successfully"
+}
+```
+- **Notes:**
+  - Public endpoint - no authentication required
+  - Returns all available AI models
+  - Can filter by active status using `isActive` query parameter
+  - Models are sorted by default status (default first) then alphabetically by name
+  - Supported providers: `openai`, `gemini`, `aws`, `anthropic`, `local`
+
+---
+
+### 107. Get Model by ID
+- **Method:** `GET`
+- **Endpoint:** `/api/v1/models/{id}`
+- **Auth Required:** No
+- **Path Parameters:**
+  - `id` (required): Model UUID
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "model": {
+      "id": "2ce1e3e8-cf21-4123-ae90-5058ad94268b",
+      "name": "GPT-4o Mini",
+      "slug": "gpt-4o-mini",
+      "description": "OpenAI GPT-4o Mini model",
+      "provider": "openai",
+      "modelName": "gpt-4o-mini",
+      "isActive": true,
+      "isDefault": false,
+      "metadata": null,
+      "createdAt": "2026-02-05T12:55:27.391Z",
+      "updatedAt": "2026-02-05T12:55:27.391Z"
+    }
+  },
+  "message": "Model retrieved successfully"
+}
+```
+- **Notes:**
+  - Public endpoint - no authentication required
+  - Returns detailed information about a specific model
+  - Returns 404 if model not found
+
+---
+
+### 108. Create Model (Admin Only)
+- **Method:** `POST`
+- **Endpoint:** `/api/v1/models`
+- **Auth Required:** Yes (Admin only)
+- **Headers:**
+  - `Authorization: Bearer <access_token>`
+  - `Content-Type: application/json`
+- **Request Body:**
+```json
+{
+  "name": "GPT-4o Mini",
+  "slug": "gpt-4o-mini",
+  "description": "OpenAI GPT-4o Mini model",
+  "provider": "openai",
+  "modelName": "gpt-4o-mini",
+  "isActive": true,
+  "isDefault": false,
+  "metadata": null
+}
+```
+- **Field Requirements:**
+  - `name` (required): Display name of the model (1-255 characters)
+  - `slug` (required): URL-friendly identifier (1-255 characters, lowercase letters, numbers, and hyphens only). Must be unique.
+  - `description` (optional): Model description (max 1000 characters)
+  - `provider` (optional): AI provider. One of: `openai`, `gemini`, `aws`, `anthropic`, `local`. Defaults to `aws`.
+  - `modelName` (optional): Specific model identifier (e.g., "gpt-4o-mini", "gemini-1.5-flash")
+  - `isActive` (optional): Whether the model should be active. Defaults to `true`.
+  - `isDefault` (optional): Whether this should be the default model. Defaults to `false`.
+  - `metadata` (optional): Additional configuration/metadata as JSON object
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "model": {
+      "id": "2ce1e3e8-cf21-4123-ae90-5058ad94268b",
+      "name": "GPT-4o Mini",
+      "slug": "gpt-4o-mini",
+      "description": "OpenAI GPT-4o Mini model",
+      "provider": "openai",
+      "modelName": "gpt-4o-mini",
+      "isActive": true,
+      "isDefault": false,
+      "metadata": null,
+      "createdAt": "2026-02-05T12:55:27.391Z",
+      "updatedAt": "2026-02-05T12:55:27.391Z"
+    }
+  },
+  "message": "Model created successfully"
+}
+```
+- **Notes:**
+  - **Admin access required** - Only users with admin role can create models
+  - Slug must be unique across all models
+  - Returns 409 Conflict if slug already exists
+  - Returns 403 Forbidden if user is not an admin
+  - Model can be used in chats once created and active
+
+---
+
 ## Health & Info Endpoints
 
 ### 104. Health Check

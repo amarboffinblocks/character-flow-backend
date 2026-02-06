@@ -31,12 +31,15 @@ export async function createChatCompletion(
     messages: ChatMessage[]
 ): Promise<ChatCompletionResult> {
     const client = getClient(options.provider) as OpenAI;
+    console.log("options", options)
 
     // Default model names per provider
     const defaultModels: Record<ModelProvider, string> = {
         openai: "gpt-4o-mini",
-        gemini: "gemini-1.5-flash",
-        aws: "gpt-4o-mini", // fallback for AWS
+        gemini: "gemini-2.5-flash",
+        aws: "gpt-4o-mini",
+        anthropic: "claude-3-sonnet",
+        local: "local-llm",
     };
 
     const model = options.modelName || defaultModels[options.provider];

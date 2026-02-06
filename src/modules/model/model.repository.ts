@@ -1,21 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
 import type { Model, ModelQueryParams } from './model.types.js';
-import type { PrismaClient } from '@prisma/client';
-
-// Type assertion to help TypeScript recognize the model property
-// This is a workaround for TypeScript language server cache issues
-// The model property exists at runtime (verified via runtime check)
-// After TypeScript language server reloads, this can be removed
-const prismaWithModel = prisma as PrismaClientWithModel;
-
-type PrismaClientWithModel = PrismaClient & {
-  model: {
-    findUnique: <T extends { where: { id: string } | { slug: string } }>(args: T) => Promise<Model | null>;
-    findFirst: <T extends { where: { isDefault: boolean; isActive: boolean } }>(args: T) => Promise<Model | null>;
-    findMany: <T extends { where?: { isActive?: boolean }; orderBy: Array<{ isDefault: 'desc' } | { name: 'asc' }> }>(args: T) => Promise<Model[]>;
-    create: <T extends { data: unknown }>(args: T) => Promise<Model>;
-  };
-};
 
 // ============================================
 // Model Repository
@@ -23,13 +7,13 @@ type PrismaClientWithModel = PrismaClient & {
 
 export const modelRepository = {
   async findModelById(id: string): Promise<Model | null> {
-    return prismaWithModel.model.findUnique({
+    return (prisma as any).model.findUnique({
       where: { id },
     });
   },
 
   async findModelBySlug(slug: string): Promise<Model | null> {
-    return prismaWithModel.model.findUnique({
+    return (prisma as any).model.findUnique({
       where: { slug },
     });
   },
@@ -39,7 +23,7 @@ export const modelRepository = {
     if (params?.isActive !== undefined) {
       where.isActive = params.isActive;
     }
-    return prismaWithModel.model.findMany({
+    return (prisma as any).model.findMany({
       where,
       orderBy: [
         { isDefault: 'desc' },
@@ -49,7 +33,7 @@ export const modelRepository = {
   },
 
   async findDefaultModel(): Promise<Model | null> {
-    return prismaWithModel.model.findFirst({
+    return (prisma as any).model.findFirst({
       where: { isDefault: true, isActive: true },
     });
   },
@@ -64,7 +48,7 @@ export const modelRepository = {
     isDefault?: boolean;
     metadata?: unknown;
   }): Promise<Model> {
-    return prismaWithModel.model.create({
+    return (prisma as any).model.create({
       data: {
         name: data.name,
         slug: data.slug,

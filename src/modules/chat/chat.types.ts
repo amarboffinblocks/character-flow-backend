@@ -13,7 +13,7 @@ export interface CreateChatInput {
   characterId?: string | null;
   realmId?: string | null;
   folderId?: string | null;
-  modelId: string; // User-selected AI model for this chat (required for model switching)
+  modelId?: string | null; // User-selected AI model for this chat (optional - will use default model if not provided)
   title?: string | null;
 }
 

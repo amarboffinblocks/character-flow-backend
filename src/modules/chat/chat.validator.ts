@@ -2,21 +2,37 @@ import { z } from 'zod';
 import { PAGINATION_CONSTANTS } from '../../core/constants/index.js';
 
 // ============================================
+// Common Validators
+// ============================================
+
+// Optional UUID schema - handles empty strings, null, and undefined
+const optionalUuidSchema = z
+  .union([
+    z.string().uuid('Invalid UUID format'),
+    z.string().length(0),
+    z.null(),
+    z.undefined(),
+  ])
+  .optional()
+  .nullable()
+  .transform((val) => (val === '' ? null : val));
+
+// ============================================
 // Chat Schemas
 // ============================================
 
 export const createChatSchema = z.object({
-  characterId: z.string().uuid().optional().nullable(),
-  realmId: z.string().uuid().optional().nullable(),
-  folderId: z.string().uuid().optional().nullable(),
-  modelId: z.string().uuid('Model ID must be a valid UUID'),
+  characterId: optionalUuidSchema,
+  realmId: optionalUuidSchema,
+  folderId: optionalUuidSchema,
+  modelId: optionalUuidSchema,
   title: z.string().max(500).trim().optional().nullable(),
 });
 
 export const updateChatSchema = z.object({
   title: z.string().max(500).trim().optional().nullable(),
-  folderId: z.string().uuid().optional().nullable(),
-  modelId: z.string().uuid('Model ID must be a valid UUID').optional().nullable(),
+  folderId: optionalUuidSchema,
+  modelId: optionalUuidSchema,
 });
 
 export const chatQuerySchema = z.object({

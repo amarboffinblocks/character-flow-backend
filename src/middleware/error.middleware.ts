@@ -52,10 +52,10 @@ export const errorHandler = (
 
   // Handle Zod validation errors
   if (error instanceof ZodError) {
-    const details = error.errors.map((err) => ({
-      field: err.path.join('.'),
-      message: err.message,
-      code: err.code,
+    const details = (error.issues || []).map((err) => ({
+      field: (err.path || []).join('.'),
+      message: err.message || 'Validation error',
+      code: err.code || 'invalid_type',
     }));
 
     logger.warn({ ...errorContext, validationErrors: details }, 'Validation error');
@@ -81,6 +81,19 @@ export const errorHandler = (
       : 'An error occurred. Please try again later.';
 
     sendError(res, message, error.code as string, error.statusCode, error.details);
+    return;
+  }
+
+  // Handle JSON syntax errors (from express.json() middleware)
+  if (errorObj instanceof SyntaxError && errorObj.message.includes('JSON')) {
+    logger.warn({ ...errorContext }, 'JSON parsing error');
+    sendError(
+      res,
+      'Invalid JSON format. Please check your request body for syntax errors (e.g., trailing commas, missing quotes).',
+      'BAD_REQUEST',
+      400,
+      config.app.isDev ? { originalError: errorObj.message } : undefined
+    );
     return;
   }
 
