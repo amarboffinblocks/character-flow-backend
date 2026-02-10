@@ -2,25 +2,25 @@ services:
   # ============================================
   # PostgreSQL Database
   # ============================================
-  postgres:
-    image: postgres:16-alpine
-    container_name: youruniverse-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-youruniverse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-youruniverse_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-youruniverse_db}
-    ports:
-      - '5433:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-youruniverse}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - youruniverse-network
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: youruniverse-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-youruniverse}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-youruniverse_secret}
+  #     POSTGRES_DB: ${POSTGRES_DB:-youruniverse_db}
+  #   ports:
+  #     - '5433:5432'
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-youruniverse}']
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - youruniverse-network
 
   # ============================================
   # Redis Cache
