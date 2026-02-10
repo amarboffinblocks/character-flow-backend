@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { ZodSchema, ZodError } from 'zod';
+import { ZodSchema, ZodError, type ZodIssue } from 'zod';
 import { sendError } from '../utils/response.js';
 
 // ============================================
@@ -24,13 +24,13 @@ export const validate = (schemas: ValidationSchemas) => {
       }
 
       if (schemas.params) {
-        req.params = schemas.params.parse(req.params);
+        req.params = schemas.params.parse(req.params) as Request['params'];
       }
 
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const details = error.errors.map((err) => ({
+        const details = error.issues.map((err: ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -55,7 +55,7 @@ export const validateBody = <T>(schema: ZodSchema<T>) => {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const details = error.errors.map((err) => ({
+        const details = error.issues.map((err: ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -80,7 +80,7 @@ export const validateQuery = <T>(schema: ZodSchema<T>) => {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const details = error.errors.map((err) => ({
+        const details = error.issues.map((err: ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -106,7 +106,7 @@ export const validateParams = <T>(schema: ZodSchema<T>) => {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const details = error.errors.map((err) => ({
+        const details = error.issues.map((err: ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
         }));

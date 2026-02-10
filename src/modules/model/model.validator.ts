@@ -22,5 +22,5 @@ export const createModelSchema = z.object({
   modelName: z.string().max(255).optional().nullable(),
   isActive: z.boolean().optional().default(true),
   isDefault: z.boolean().optional().default(false),
-  metadata: z.union([z.record(z.unknown()), z.object({}).passthrough(), z.null()]).optional().nullable(),
+  metadata: z.union([z.record(z.string(), z.unknown()), z.object({}).passthrough(), z.null()]).optional().nullable(),
 });

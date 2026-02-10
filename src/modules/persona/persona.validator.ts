@@ -22,12 +22,12 @@ const descriptionSchema = z
   .nullable();
 
 const avatarSchema = z
-  .record(z.unknown())
+  .record(z.string(), z.unknown())
   .optional()
   .nullable();
 
 const backgroundImgSchema = z
-  .record(z.unknown())
+  .record(z.string(), z.unknown())
   .optional()
   .nullable();
 

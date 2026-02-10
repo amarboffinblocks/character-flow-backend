@@ -338,14 +338,14 @@ export const chatService = {
 
     for await (const chunk of stream) {
       if (chunk.type === "content") {
-        fullAssistantReply += chunk.content;
+        const content = chunk.content ?? "";
+        fullAssistantReply += content;
 
         // 🔥 CRITICAL: Split chunk into individual characters for TRUE token-by-token streaming
         // OpenAI delta.content can contain multiple tokens (e.g., "Hello! I'm")
         // Splitting character-by-character creates ChatGPT-like smooth streaming UX
-        const content = chunk.content;
         for (let i = 0; i < content.length; i++) {
-          yield { type: "content", content: content[i] };
+          yield { type: "content", content: content.charAt(i) };
         }
       }
 
