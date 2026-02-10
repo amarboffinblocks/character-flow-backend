@@ -1,8 +1,6 @@
 import { chatRepository } from './chat.repository.js';
 import { modelService } from '../model/index.js';
 import { modelRepository } from '../model/model.repository.js';
-import { createChatCompletion, type ChatMessage } from '../../lib/ai/agent.js';
-import { prisma } from '../../lib/prisma.js';
 import { createError } from '../../utils/index.js';
 import type {
   CreateChatInput,
@@ -18,7 +16,9 @@ import type {
   SendMessageResponse,
   MessageListResponse,
 } from './chat.types.js';
-
+import { chatAIService, StreamChunk } from './ai/chat.ai.service.js';
+import { createChatCompletion, createChatCompletionStream } from "./ai/llm.gateway.js";
+import type { ChatMessage } from "./ai/llm.gateway.js";
 // ============================================
 // Chat Service
 // ============================================
@@ -198,21 +198,18 @@ export const chatService = {
   },
 
   // ============================================
-  // Send Message to LLM
+  // Helper: Get and validate model for chat
   // ============================================
 
-  async sendMessage(chatId: string, userId: string, input: CreateMessageInput): Promise<SendMessageResponse> {
-    // Get chat
+  async getModelForChat(chatId: string, userId: string) {
     const chat = await chatRepository.findChatByIdAndUser(chatId, userId);
     if (!chat) {
       throw createError.notFound('Chat not found');
     }
 
-    // Get modelId from chat or use default model
     let modelId = (chat as { modelId?: string | null }).modelId;
     let model = modelId ? await modelRepository.findModelById(modelId) : null;
 
-    // If no model selected or model not available, use default model
     if (!modelId || !model || !model.isActive) {
       const defaultModel = await modelRepository.findDefaultModel();
       if (!defaultModel || !defaultModel.isActive) {
@@ -222,48 +219,158 @@ export const chatService = {
       modelId = defaultModel.id;
     }
 
-    // Get user message from input
-    const userMessage = input.content;
+    return { chat, model, modelId };
+  },
 
-    // Configure AI options from model
+  // ============================================
+  // Helper: Build conversation messages
+  // ============================================
+
+  // NEW ✅ DB is source of truth
+  async buildConversationMessages(chatId: string): Promise<ChatMessage[]> {
+    const { messages } = await chatRepository.findMessagesByChat(chatId, {
+      limit: 0,
+      sortOrder: "asc",
+    });
+
+    return messages.map((msg) => ({
+      role: msg.role as "user" | "assistant" | "system",
+      content: msg.content,
+    }));
+  },
+
+  // ============================================
+  // Send Message to LLM
+  // ============================================
+
+  async sendMessage(
+    chatId: string,
+    userId: string,
+    input: CreateMessageInput
+  ): Promise<SendMessageResponse> {
+
+    const { model } = await this.getModelForChat(chatId, userId);
+    const userRole = input.role || "user";
+
     const aiOptions = {
-      provider: model.provider as "openai" | "gemini" | "aws" | "anthropic" | "local",
-      modelName: model.modelName || "gemini-2.5-flash",
+      provider: model.provider as any,
+      modelName: model.modelName || undefined,
       instructions: "You are a helpful AI assistant.",
       temperature: 0.7,
     };
 
-    // Build messages array
-    const messages: ChatMessage[] = [
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ];
+    // 1️⃣ Save user message first
+    const savedUserMessage = await chatRepository.createMessage({
+      chatId,
+      role: userRole as "user" | "assistant" | "system",
+      content: input.content,
+      tokensUsed: null,
+      metadata: null,
+    });
 
-    // Call LLM
-    const result = await createChatCompletion(aiOptions, messages);
+    // 2️⃣ Build full conversation AFTER saving
+    const messages = await this.buildConversationMessages(chatId);
 
-    // Return response
+    // ⭐⭐⭐ CORRECT CALL ⭐⭐⭐
+    const result = await chatAIService.generateReply({
+      ...aiOptions,
+      messages,
+    });
+
+    if (!result.content) {
+      throw new Error("LLM returned empty response");
+    }
+
+    // 3️⃣ Save assistant message
+    const savedAssistantMessage = await chatRepository.createMessage({
+      chatId,
+      role: "assistant",
+      content: result.content,
+      tokensUsed: result.usage?.totalTokens || null,
+      metadata: { provider: aiOptions.provider, modelId: model.id },
+    });
+
     return {
-      userMessage: {
-        id: "test-user-msg",
-        chatId: chatId,
-        role: "user",
-        content: userMessage,
-        tokensUsed: null,
-        metadata: null,
-        createdAt: new Date(),
-      },
-      assistantMessage: {
-        id: "test-assistant-msg",
-        chatId: chatId,
-        role: "assistant",
-        content: result.content,
-        tokensUsed: result.usage?.totalTokens || null,
-        metadata: { provider: aiOptions.provider, modelId: model.id },
-        createdAt: new Date(),
-      },
+      userMessage: savedUserMessage,
+      assistantMessage: savedAssistantMessage,
+    };
+  },
+
+  // ============================================
+  // STREAM MESSAGE (SSE)
+  // ============================================
+  async *streamMessage(
+    chatId: string,
+    userId: string,
+    input: CreateMessageInput
+  ): AsyncGenerator<StreamChunk> {
+
+    const { model } = await this.getModelForChat(chatId, userId);
+    const userRole = input.role || "user";
+
+    const aiOptions = {
+      provider: model.provider as any,
+      modelName: model.modelName || undefined,
+      instructions: "You are a helpful AI assistant.",
+      temperature: 0.7,
+    };
+
+    // 1️⃣ Save user message
+    await chatRepository.createMessage({
+      chatId,
+      role: userRole as "user" | "assistant" | "system",
+      content: input.content,
+      tokensUsed: null,
+      metadata: null,
+    });
+
+    // 2️⃣ Build conversation
+    const messages = await this.buildConversationMessages(chatId);
+
+    // ⭐⭐⭐ CORRECT STREAM ⭐⭐⭐
+    const stream = chatAIService.streamReply({
+      ...aiOptions,
+      messages,
+    });
+
+    let fullAssistantReply = "";
+    let usage: any = null;
+
+    for await (const chunk of stream) {
+      if (chunk.type === "content") {
+        fullAssistantReply += chunk.content;
+
+        // 🔥 CRITICAL: Split chunk into individual characters for TRUE token-by-token streaming
+        // OpenAI delta.content can contain multiple tokens (e.g., "Hello! I'm")
+        // Splitting character-by-character creates ChatGPT-like smooth streaming UX
+        const content = chunk.content;
+        for (let i = 0; i < content.length; i++) {
+          yield { type: "content", content: content[i] };
+        }
+      }
+
+      if (chunk.type === "usage") {
+        usage = chunk.usage;
+      }
+    }
+
+    if (!fullAssistantReply.trim()) {
+      throw new Error("Stream ended with empty assistant reply");
+    }
+
+    // 3️⃣ Save assistant message
+    const savedAssistantMessage = await chatRepository.createMessage({
+      chatId,
+      role: "assistant",
+      content: fullAssistantReply,
+      tokensUsed: usage?.totalTokens || null,
+      metadata: { provider: aiOptions.provider, modelId: model.id },
+    });
+
+    yield {
+      type: "done",
+      messageId: savedAssistantMessage.id,
+      usage,
     };
   },
 

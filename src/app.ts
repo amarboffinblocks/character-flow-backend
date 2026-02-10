@@ -93,7 +93,18 @@ export const createApp = async (): Promise<express.Application> => {
   // General Middleware
   // ============================================
 
-  app.use(compression());
+  // Compression middleware - skip SSE streams
+  app.use(compression({
+    filter: (req, res) => {
+      // Don't compress SSE responses (check query param or Accept header)
+      const isSSE = req.query.stream === 'true' || req.headers.accept?.includes('text/event-stream');
+      if (isSSE) {
+        return false;
+      }
+      // Use default compression filter for other responses
+      return compression.filter(req, res);
+    },
+  }));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());

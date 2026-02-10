@@ -139,23 +139,25 @@ export const chatRepository = {
     data: CreateChatData,
     messages: Array<{ role: string; content: string; tokensUsed?: number | null; metadata?: unknown }>
   ): Promise<Chat & { _count: { messages: number } }> {
-    const chat = await prisma.chat.create({
-      data: {
-        userId: data.userId,
-        characterId: data.characterId ?? undefined,
-        realmId: data.realmId ?? undefined,
-        folderId: data.folderId ?? undefined,
-        modelId: data.modelId ?? undefined,
-        title: data.title ?? undefined,
-        messages: {
-          create: messages.map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-            tokensUsed: msg.tokensUsed ?? undefined,
-            metadata: msg.metadata ? (msg.metadata as Prisma.InputJsonValue) : undefined,
-          })),
-        },
+    const createPayload = {
+      userId: data.userId,
+      characterId: data.characterId ?? undefined,
+      realmId: data.realmId ?? undefined,
+      folderId: data.folderId ?? undefined,
+      modelId: data.modelId ?? undefined,
+      title: data.title ?? undefined,
+      messages: {
+        create: messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+          tokensUsed: msg.tokensUsed ?? undefined,
+          metadata: msg.metadata ? (msg.metadata as Prisma.InputJsonValue) : undefined,
+        })),
       },
+    } as Prisma.ChatUncheckedCreateInput;
+
+    const chat = await prisma.chat.create({
+      data: createPayload,
       include: {
         _count: { select: { messages: true } },
       },
