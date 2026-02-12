@@ -104,6 +104,25 @@ export interface SendMessageResponse {
   };
 }
 
+/** Response when sending a message with streaming - avoids referencing AI SDK internal types */
+export interface SendMessageStreamResponse {
+  userMessage: {
+    id: string;
+    chatId: string;
+    role: string;
+    content: string;
+    tokensUsed: number | null;
+    metadata: unknown;
+    createdAt: Date;
+  };
+  streamResult: {
+    pipeUIMessageStreamToResponse: (
+      response: import('http').ServerResponse,
+      init?: { consumeSseStream?: (opts: { stream: ReadableStream }) => void | Promise<void> }
+    ) => void;
+  };
+}
+
 export interface MessageListResponse {
   messages: Array<{
     id: string;

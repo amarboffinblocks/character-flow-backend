@@ -56,9 +56,17 @@ export const chatQuerySchema = z.object({
 // ============================================
 
 export const createMessageSchema = z.object({
-  content: z.string().min(1, 'Message content is required').max(10000, 'Message content is too long'),
+  content: z.string().max(10000, 'Message content is too long').optional(),
   role: z.enum(['user', 'assistant', 'system']).optional().default('user'),
-});
+  trigger: z.enum(['regenerate']).optional(),
+  messageId: z.string().uuid().optional(),
+}).refine(
+  (data) => {
+    if (data.trigger === 'regenerate') return !!data.messageId;
+    return !!data.content && data.content.length > 0;
+  },
+  { message: 'Either content (for new message) or trigger+messageId (for regenerate) is required' }
+);
 
 export const messageQuerySchema = z.object({
   page: z.preprocess(

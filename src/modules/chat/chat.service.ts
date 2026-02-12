@@ -13,12 +13,12 @@ import type {
   UpdateChatData,
   CreateMessageInput,
   MessageQueryParams,
-  SendMessageResponse,
   MessageListResponse,
+  SendMessageStreamResponse,
 } from './chat.types.js';
-import { chatAIService, StreamChunk } from './ai/chat.ai.service.js';
-import { createChatCompletion, createChatCompletionStream } from "./ai/llm.gateway.js";
-import type { ChatMessage } from "./ai/llm.gateway.js";
+import { streamLLM } from './ai/stream-llm.js';
+import { mapProviderToModelProvider } from './ai/model-router.js';
+import { toModelMessages } from './ai/message-converter.js';
 // ============================================
 // Chat Service
 // ============================================
@@ -226,15 +226,14 @@ export const chatService = {
   // Helper: Build conversation messages
   // ============================================
 
-  // NEW ✅ DB is source of truth
-  async buildConversationMessages(chatId: string): Promise<ChatMessage[]> {
+  async buildConversationMessages(chatId: string): Promise<Array<{ role: 'user' | 'assistant' | 'system'; content: string }>> {
     const { messages } = await chatRepository.findMessagesByChat(chatId, {
       limit: 0,
-      sortOrder: "asc",
+      sortOrder: 'asc',
     });
 
     return messages.map((msg) => ({
-      role: msg.role as "user" | "assistant" | "system",
+      role: msg.role as 'user' | 'assistant' | 'system',
       content: msg.content,
     }));
   },
@@ -246,131 +245,97 @@ export const chatService = {
   async sendMessage(
     chatId: string,
     userId: string,
-    input: CreateMessageInput
-  ): Promise<SendMessageResponse> {
+    input: CreateMessageInput & { trigger?: 'regenerate'; messageId?: string }
+  ): Promise<SendMessageStreamResponse> {
+    const { chat, model } = await this.getModelForChat(chatId, userId);
+    const provider = mapProviderToModelProvider(model.provider);
 
-    const { model } = await this.getModelForChat(chatId, userId);
-    const userRole = input.role || "user";
+    let userMessage: SendMessageStreamResponse['userMessage'];
+    let contextMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
 
-    const aiOptions = {
-      provider: model.provider as any,
-      modelName: model.modelName || undefined,
-      instructions: "You are a helpful AI assistant.",
-      temperature: 0.7,
-    };
-
-    // 1️⃣ Save user message first
-    const savedUserMessage = await chatRepository.createMessage({
-      chatId,
-      role: userRole as "user" | "assistant" | "system",
-      content: input.content,
-      tokensUsed: null,
-      metadata: null,
-    });
-
-    // 2️⃣ Build full conversation AFTER saving
-    const messages = await this.buildConversationMessages(chatId);
-
-    // ⭐⭐⭐ CORRECT CALL ⭐⭐⭐
-    const result = await chatAIService.generateReply({
-      ...aiOptions,
-      messages,
-    });
-
-    if (!result.content) {
-      throw new Error("LLM returned empty response");
+    if (input.trigger === 'regenerate' && input.messageId) {
+      // Regenerate: remove the assistant message, use context up to last user message
+      const { messages } = await chatRepository.findMessagesByChat(chatId, {
+        limit: 0,
+        sortOrder: 'asc',
+      });
+      const msgIndex = messages.findIndex((m) => m.id === input.messageId);
+      if (msgIndex === -1) {
+        throw createError.notFound('Message not found for regeneration');
+      }
+      const msgToRegen = messages[msgIndex];
+      if (!msgToRegen || msgToRegen.role !== 'assistant') {
+        throw createError.badRequest('Can only regenerate assistant messages');
+      }
+      await chatRepository.deleteMessage(input.messageId);
+      const messagesBefore = messages.slice(0, msgIndex).map((m) => ({
+        role: m.role as 'user' | 'assistant' | 'system',
+        content: m.content,
+      }));
+      const lastUser = [...messagesBefore].reverse().find((m) => m.role === 'user');
+      if (!lastUser) {
+        throw createError.badRequest('No user message found to regenerate from');
+      }
+      const lastUserMsg = messages[msgIndex - 1];
+      if (!lastUserMsg) throw createError.badRequest('No user message found to regenerate from');
+      userMessage = {
+        id: lastUserMsg.id,
+        chatId: lastUserMsg.chatId,
+        role: lastUserMsg.role,
+        content: lastUserMsg.content,
+        tokensUsed: lastUserMsg.tokensUsed ?? null,
+        metadata: lastUserMsg.metadata ?? null,
+        createdAt: lastUserMsg.createdAt,
+      };
+      contextMessages = messagesBefore;
+    } else {
+      if (!input.content?.trim()) {
+        throw createError.badRequest('Message content is required');
+      }
+      const created = await chatRepository.createMessage({
+        chatId,
+        role: 'user',
+        content: input.content,
+      });
+      userMessage = {
+        id: created.id,
+        chatId: created.chatId,
+        role: created.role,
+        content: created.content,
+        tokensUsed: created.tokensUsed ?? null,
+        metadata: created.metadata ?? null,
+        createdAt: created.createdAt,
+      };
+      contextMessages = await this.buildConversationMessages(chatId);
+      contextMessages = [
+        ...contextMessages,
+        { role: 'user' as const, content: input.content },
+      ];
     }
 
-    // 3️⃣ Save assistant message
-    const savedAssistantMessage = await chatRepository.createMessage({
-      chatId,
-      role: "assistant",
-      content: result.content,
-      tokensUsed: result.usage?.totalTokens || null,
-      metadata: { provider: aiOptions.provider, modelId: model.id },
+    const messages = toModelMessages(contextMessages);
+
+    const streamResult = streamLLM({
+      provider,
+      model: model.modelName ?? undefined,
+      messages,
+
+      onFinish: async ({ text }) => {
+        await chatRepository.createMessage({
+          chatId,
+          role: 'assistant',
+          content: text,
+        });
+      },
+
+      onError: ({ error }) => {
+        console.error('[LLM STREAM ERROR]', error);
+      },
     });
 
     return {
-      userMessage: savedUserMessage,
-      assistantMessage: savedAssistantMessage,
-    };
-  },
-
-  // ============================================
-  // STREAM MESSAGE (SSE)
-  // ============================================
-  async *streamMessage(
-    chatId: string,
-    userId: string,
-    input: CreateMessageInput
-  ): AsyncGenerator<StreamChunk> {
-
-    const { model } = await this.getModelForChat(chatId, userId);
-    const userRole = input.role || "user";
-
-    const aiOptions = {
-      provider: model.provider as any,
-      modelName: model.modelName || undefined,
-      instructions: "You are a helpful AI assistant.",
-      temperature: 0.7,
-    };
-
-    // 1️⃣ Save user message
-    await chatRepository.createMessage({
-      chatId,
-      role: userRole as "user" | "assistant" | "system",
-      content: input.content,
-      tokensUsed: null,
-      metadata: null,
-    });
-
-    // 2️⃣ Build conversation
-    const messages = await this.buildConversationMessages(chatId);
-
-    // ⭐⭐⭐ CORRECT STREAM ⭐⭐⭐
-    const stream = chatAIService.streamReply({
-      ...aiOptions,
-      messages,
-    });
-
-    let fullAssistantReply = "";
-    let usage: any = null;
-
-    for await (const chunk of stream) {
-      if (chunk.type === "content") {
-        const content = chunk.content ?? "";
-        fullAssistantReply += content;
-
-        // 🔥 CRITICAL: Split chunk into individual characters for TRUE token-by-token streaming
-        // OpenAI delta.content can contain multiple tokens (e.g., "Hello! I'm")
-        // Splitting character-by-character creates ChatGPT-like smooth streaming UX
-        for (let i = 0; i < content.length; i++) {
-          yield { type: "content", content: content.charAt(i) };
-        }
-      }
-
-      if (chunk.type === "usage") {
-        usage = chunk.usage;
-      }
-    }
-
-    if (!fullAssistantReply.trim()) {
-      throw new Error("Stream ended with empty assistant reply");
-    }
-
-    // 3️⃣ Save assistant message
-    const savedAssistantMessage = await chatRepository.createMessage({
-      chatId,
-      role: "assistant",
-      content: fullAssistantReply,
-      tokensUsed: usage?.totalTokens || null,
-      metadata: { provider: aiOptions.provider, modelId: model.id },
-    });
-
-    yield {
-      type: "done",
-      messageId: savedAssistantMessage.id,
-      usage,
+      userMessage,
+      streamResult: streamResult as SendMessageStreamResponse['streamResult'],
     };
   },
 

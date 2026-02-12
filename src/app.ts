@@ -83,7 +83,7 @@ export const createApp = async (): Promise<express.Application> => {
       'Accept',
       'Origin',
     ],
-    exposedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Type', 'Authorization', 'X-User-Message-Id'],
     maxAge: 86400, // Cache preflight requests for 24 hours (in seconds)
     optionsSuccessStatus: 204, // Return 204 for OPTIONS requests
     preflightContinue: false, // End preflight requests immediately
