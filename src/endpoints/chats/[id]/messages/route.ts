@@ -1,18 +1,18 @@
 import type { Request, Response } from 'express';
 import { consumeStream } from 'ai';
 import { chatService, createMessageSchema, messageQuerySchema } from '../../../../modules/chat/index.js';
-import { sendSuccess } from '../../../../utils/response.js';
+import { createError, sendSuccess } from '../../../../utils/index.js';
 import { requireCurrentUser } from '../../../../middleware/auth.middleware.js';
 import { logger } from '../../../../lib/logger.js';
 
-// ============================================
-// POST /api/v1/chats/:id/messages - Send Message to LLM
-// ============================================
+function requireChatId(params: { id?: string }): string {
+  const chatId = params.id;
+  if (!chatId) throw createError.badRequest('Chat ID is required');
+  return chatId;
+}
 
 export const POST = async (req: Request, res: Response): Promise<void> => {
-  const { id: chatId } = req.params;
-  if (!chatId) throw new Error('Chat ID is required');
-
+  const chatId = requireChatId(req.params);
   const user = requireCurrentUser(req);
   const validated = createMessageSchema.parse(req.body);
 
@@ -42,18 +42,10 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// ============================================
-// GET /api/v1/chats/:id/messages - List Messages
-// ============================================
-
 export const GET = async (req: Request, res: Response): Promise<void> => {
-    const { id: chatId } = req.params;
-    if (!chatId) {
-        throw new Error('Chat ID is required');
-    }
-    const user = requireCurrentUser(req);
-    const queryParams = messageQuerySchema.parse(req.query);
-
-    const result = await chatService.getMessagesByChat(chatId, user.id, queryParams);
-    sendSuccess(res, result, 'Messages retrieved successfully');
+  const chatId = requireChatId(req.params);
+  const user = requireCurrentUser(req);
+  const queryParams = messageQuerySchema.parse(req.query);
+  const result = await chatService.getMessagesByChat(chatId, user.id, queryParams);
+  sendSuccess(res, result, 'Messages retrieved successfully');
 };

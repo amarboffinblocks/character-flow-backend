@@ -1,34 +1,47 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { ModelProvider } from "./model-router.js";
+import type { ModelProvider } from "./model-router.js";
 
-// Create provider instances once (singleton)
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value?.trim()) throw new Error(`Missing required env: ${name}`);
+  return value;
+}
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-});
+let _openai: ReturnType<typeof createOpenAI> | null = null;
+let _google: ReturnType<typeof createGoogleGenerativeAI> | null = null;
+let _aws: ReturnType<typeof createOpenAICompatible> | null = null;
 
-const aws = createOpenAICompatible({
-  name: "aws-llm",
-  apiKey: process.env.AWS_LLM_API_KEY || "dummy-key",
-  baseURL: process.env.AWS_LLM_BASE_URL!,
-});
+function getOpenAI() {
+  if (!_openai) _openai = createOpenAI({ apiKey: requireEnv("OPENAI_API_KEY") });
+  return _openai;
+}
 
-// return correct provider
+function getGoogle() {
+  if (!_google) _google = createGoogleGenerativeAI({ apiKey: requireEnv("GEMINI_API_KEY") });
+  return _google;
+}
+
+function getAws() {
+  if (!_aws)
+    _aws = createOpenAICompatible({
+      name: "aws-llm",
+      apiKey: process.env.AWS_LLM_API_KEY || "dummy-key",
+      baseURL: requireEnv("AWS_LLM_BASE_URL"),
+    });
+  return _aws;
+}
+
 export function getAIProvider(provider: ModelProvider) {
-    switch (provider) {
-      case "openai":
-        return openai;
-  
-      case "gemini":
-        // 🔥 Gemini needs model prefix
-        return (model: string) => google(`models/${model}`);
-  
-      case "aws":
-        return aws;
-    }
+  switch (provider) {
+    case "openai":
+      return getOpenAI();
+    case "gemini":
+      return (model: string) => getGoogle()(`models/${model}`);
+    case "aws":
+      return getAws();
+    default:
+      throw new Error(`Unsupported AI provider: ${provider}`);
   }
+}

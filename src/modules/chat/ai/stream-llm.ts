@@ -1,9 +1,13 @@
 import { streamText, smoothStream, type ModelMessage } from "ai";
 import { getAIProvider } from "./provider.js";
-import { resolveModel, ModelProvider } from "./model-router.js";
+import { resolveModel, type ModelProvider } from "./model-router.js";
 import { logger } from "../../../lib/logger.js";
 
-// 🔥 important — hide internal AI SDK types
+const SMOOTH_STREAM_CONFIG = {
+  chunking: "word" as const,
+  delayInMs: 5,
+} as const;
+
 export type StreamLLMResult = ReturnType<typeof streamText>;
 
 type StreamLLMInput = {
@@ -39,11 +43,7 @@ export function streamLLM({
     model: aiProvider(modelName),
     messages,
     temperature,
-    // Split large provider chunks (e.g. Gemini) into word-by-word streaming
-    experimental_transform: smoothStream({
-      chunking: "word",
-      delayInMs: 5,
-    }),
+    experimental_transform: smoothStream(SMOOTH_STREAM_CONFIG),
     onChunk: ({ chunk }) => {
       if (chunk.type === "text-delta" && typeof chunk.text === "string") {
         partialText.current += chunk.text;

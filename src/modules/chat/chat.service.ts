@@ -20,37 +20,29 @@ import type {
 import { streamLLM } from './ai/stream-llm.js';
 import { mapProviderToModelProvider } from './ai/model-router.js';
 import { toModelMessages } from './ai/message-converter.js';
-// ============================================
-// Chat Service
-// ============================================
+
+type ChatWithCount = { _count: { messages: number }; [key: string]: unknown };
+
+function withMessageCount<T extends ChatWithCount>(chat: T) {
+  const { _count, ...rest } = chat;
+  return { ...rest, messageCount: _count.messages } as Omit<T, '_count'> & {
+    messageCount: number;
+  };
+}
 
 export const chatService = {
   async getChatById(id: string, userId: string, options?: { includeMessages?: boolean }) {
     const chat = await chatRepository.findChatByIdAndUser(id, userId, options);
-    if (!chat) {
-      throw createError.notFound('Chat not found');
-    }
-    const { _count, ...rest } = chat;
-    const chatWithCount = rest as typeof rest & { messages?: Array<{ id: string; role: string; content: string; createdAt: Date }> };
-    return {
-      chat: {
-        ...chatWithCount,
-        messageCount: _count.messages,
-        ...(chatWithCount.messages && { messages: chatWithCount.messages }),
-      },
-    };
+    if (!chat) throw createError.notFound('Chat not found');
+    return { chat: withMessageCount(chat) };
   },
 
   async getUserChats(userId: string, params: ChatQueryParams): Promise<ChatListResponse> {
     const { page = 1, limit = 20 } = params;
     const { chats, total } = await chatRepository.findChatsByUser(userId, params);
-    const transformed = chats.map((c) => {
-      const { _count, ...data } = c;
-      return { ...data, messageCount: _count.messages };
-    });
     const totalPages = limit === 0 ? 1 : Math.ceil(total / limit);
     return {
-      chats: transformed,
+      chats: chats.map(withMessageCount),
       pagination: { page, limit, total, totalPages },
     };
   },
@@ -79,10 +71,7 @@ export const chatService = {
       title: input.title ?? null,
     };
     const chat = await chatRepository.createChat(data);
-    const { _count, ...rest } = chat;
-    return {
-      chat: { ...rest, messageCount: _count.messages },
-    };
+    return { chat: withMessageCount(chat) };
   },
 
   async updateChat(id: string, userId: string, input: UpdateChatInput): Promise<ChatResponse> {
@@ -102,10 +91,7 @@ export const chatService = {
       modelId: input.modelId,
     };
     const chat = await chatRepository.updateChat(id, updateData);
-    const { _count, ...rest } = chat;
-    return {
-      chat: { ...rest, messageCount: _count.messages },
-    };
+    return { chat: withMessageCount(chat) };
   },
 
   async deleteChat(id: string, userId: string): Promise<MessageResponse> {
@@ -144,10 +130,7 @@ export const chatService = {
       throw createError.notFound('Chat not found');
     }
     const chat = await chatRepository.toggleArchive(id, !existing.isActive);
-    const { _count, ...rest } = chat;
-    return {
-      chat: { ...rest, messageCount: _count.messages },
-    };
+    return { chat: withMessageCount(chat) };
   },
 
   // ============================================
@@ -160,10 +143,7 @@ export const chatService = {
       throw createError.notFound('Chat not found');
     }
     const chat = await chatRepository.togglePin(id, !existing.isPinned);
-    const { _count, ...rest } = chat;
-    return {
-      chat: { ...rest, messageCount: _count.messages },
-    };
+    return { chat: withMessageCount(chat) };
   },
 
   // ============================================
@@ -192,10 +172,7 @@ export const chatService = {
     };
 
     const newChat = await chatRepository.createChatWithMessages(newChatData, messages);
-    const { _count, ...rest } = newChat;
-    return {
-      chat: { ...rest, messageCount: _count.messages },
-    };
+    return { chat: withMessageCount(newChat) };
   },
 
   // ============================================
@@ -221,22 +198,6 @@ export const chatService = {
     }
 
     return { chat, model, modelId };
-  },
-
-  // ============================================
-  // Helper: Build conversation messages
-  // ============================================
-
-  async buildConversationMessages(chatId: string): Promise<Array<{ role: 'user' | 'assistant' | 'system'; content: string }>> {
-    const { messages } = await chatRepository.findMessagesByChat(chatId, {
-      limit: 0,
-      sortOrder: 'asc',
-    });
-
-    return messages.map((msg) => ({
-      role: msg.role as 'user' | 'assistant' | 'system',
-      content: msg.content,
-    }));
   },
 
   // ============================================
