@@ -93,15 +93,19 @@ export const createApp = async (): Promise<express.Application> => {
   // General Middleware
   // ============================================
 
-  // Compression middleware - skip SSE streams
+  // Compression middleware - skip SSE/streaming responses
   app.use(compression({
     filter: (req, res) => {
-      // Don't compress SSE responses (check query param or Accept header)
+      // Don't compress chat message stream (POST to /chats/:id/messages returns SSE)
+      const isChatStream = req.method === 'POST' && /\/api\/v1\/chats\/[^/]+\/messages$/.test(req.path);
+      if (isChatStream) {
+        return false;
+      }
+      // Don't compress other SSE responses
       const isSSE = req.query.stream === 'true' || req.headers.accept?.includes('text/event-stream');
       if (isSSE) {
         return false;
       }
-      // Use default compression filter for other responses
       return compression.filter(req, res);
     },
   }));

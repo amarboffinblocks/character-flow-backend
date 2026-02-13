@@ -2,6 +2,7 @@ import { chatRepository } from './chat.repository.js';
 import { modelService } from '../model/index.js';
 import { modelRepository } from '../model/model.repository.js';
 import { createError } from '../../utils/index.js';
+import { logger } from '../../lib/logger.js';
 import type {
   CreateChatInput,
   UpdateChatInput,
@@ -253,72 +254,43 @@ export const chatService = {
     let userMessage: SendMessageStreamResponse['userMessage'];
     let contextMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
 
-    if (input.trigger === 'regenerate' && input.messageId) {
-      // Regenerate: remove the assistant message, use context up to last user message
-      const { messages } = await chatRepository.findMessagesByChat(chatId, {
-        limit: 0,
-        sortOrder: 'asc',
-      });
-      const msgIndex = messages.findIndex((m) => m.id === input.messageId);
-      if (msgIndex === -1) {
-        throw createError.notFound('Message not found for regeneration');
-      }
-      const msgToRegen = messages[msgIndex];
-      if (!msgToRegen || msgToRegen.role !== 'assistant') {
-        throw createError.badRequest('Can only regenerate assistant messages');
-      }
-      await chatRepository.deleteMessage(input.messageId);
-      const messagesBefore = messages.slice(0, msgIndex).map((m) => ({
-        role: m.role as 'user' | 'assistant' | 'system',
-        content: m.content,
-      }));
-      const lastUser = [...messagesBefore].reverse().find((m) => m.role === 'user');
-      if (!lastUser) {
-        throw createError.badRequest('No user message found to regenerate from');
-      }
-      const lastUserMsg = messages[msgIndex - 1];
-      if (!lastUserMsg) throw createError.badRequest('No user message found to regenerate from');
-      userMessage = {
-        id: lastUserMsg.id,
-        chatId: lastUserMsg.chatId,
-        role: lastUserMsg.role,
-        content: lastUserMsg.content,
-        tokensUsed: lastUserMsg.tokensUsed ?? null,
-        metadata: lastUserMsg.metadata ?? null,
-        createdAt: lastUserMsg.createdAt,
-      };
-      contextMessages = messagesBefore;
-    } else {
-      if (!input.content?.trim()) {
-        throw createError.badRequest('Message content is required');
-      }
-      const created = await chatRepository.createMessage({
-        chatId,
-        role: 'user',
-        content: input.content,
-      });
-      userMessage = {
-        id: created.id,
-        chatId: created.chatId,
-        role: created.role,
-        content: created.content,
-        tokensUsed: created.tokensUsed ?? null,
-        metadata: created.metadata ?? null,
-        createdAt: created.createdAt,
-      };
-      contextMessages = await this.buildConversationMessages(chatId);
-      contextMessages = [
-        ...contextMessages,
-        { role: 'user' as const, content: input.content },
-      ];
+    // Simple live chat: no history, only current user message
+    if (input.trigger === 'regenerate') {
+      throw createError.badRequest('Regenerate is not supported in simple chat mode');
     }
+    if (!input.content?.trim()) {
+      throw createError.badRequest('Message content is required');
+    }
+    const created = await chatRepository.createMessage({
+      chatId,
+      role: 'user',
+      content: input.content,
+    });
+    userMessage = {
+      id: created.id,
+      chatId: created.chatId,
+      role: created.role,
+      content: created.content,
+      tokensUsed: created.tokensUsed ?? null,
+      metadata: created.metadata ?? null,
+      createdAt: created.createdAt,
+    };
+    contextMessages = [{ role: 'user' as const, content: input.content }];
 
     const messages = toModelMessages(contextMessages);
+
+    const logContext = { chatId, userId, messageId: userMessage.id };
+
+    logger.info(
+      { ...logContext, provider, model: model.modelName, messageCount: messages.length },
+      'Starting LLM stream'
+    );
 
     const streamResult = streamLLM({
       provider,
       model: model.modelName ?? undefined,
       messages,
+      logContext,
 
       onFinish: async ({ text }) => {
         await chatRepository.createMessage({
@@ -328,8 +300,16 @@ export const chatService = {
         });
       },
 
-      onError: ({ error }) => {
-        console.error('[LLM STREAM ERROR]', error);
+      onError: () => {
+        // Error already logged in stream-llm with full context
+      },
+
+      onPartialSave: async ({ partialText }) => {
+        await chatRepository.createMessage({
+          chatId,
+          role: 'assistant',
+          content: partialText.trim() || '(Response was interrupted)',
+        });
       },
     });
 

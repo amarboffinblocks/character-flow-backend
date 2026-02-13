@@ -27,6 +27,15 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
+  // If response already sent (e.g. streaming started), log and bail - cannot send JSON
+  if (res.headersSent) {
+    logger.error(
+      { err: error, path: req.path, method: req.method },
+      'Error after response headers sent (streaming route)'
+    );
+    return;
+  }
+
   // Extract error information
   const errorObj = error instanceof Error ? error : new Error(String(error));
   const errorId = `err_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
