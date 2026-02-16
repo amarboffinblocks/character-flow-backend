@@ -23,6 +23,9 @@ import { toModelMessages } from './ai/message-converter.js';
 
 type ChatWithCount = { _count: { messages: number }; [key: string]: unknown };
 
+/** Max number of prior messages to include as context for the LLM */
+const MAX_HISTORY_MESSAGES = 50;
+
 function withMessageCount<T extends ChatWithCount>(chat: T) {
   const { _count, ...rest } = chat;
   return { ...rest, messageCount: _count.messages } as Omit<T, '_count'> & {
@@ -215,7 +218,6 @@ export const chatService = {
     let userMessage: SendMessageStreamResponse['userMessage'];
     let contextMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
 
-    // Simple live chat: no history, only current user message
     if (input.trigger === 'regenerate') {
       throw createError.badRequest('Regenerate is not supported in simple chat mode');
     }
@@ -236,7 +238,16 @@ export const chatService = {
       metadata: created.metadata ?? null,
       createdAt: created.createdAt,
     };
-    contextMessages = [{ role: 'user' as const, content: input.content }];
+
+    // Fetch most recent chat history for LLM context (then reverse to chronological order)
+    const { messages: recentMessages } = await chatRepository.findMessagesByChat(chatId, {
+      limit: MAX_HISTORY_MESSAGES,
+      sortOrder: 'desc',
+    });
+    const historyMessages = [...recentMessages].reverse();
+    contextMessages = historyMessages
+      .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
+      .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
 
     const messages = toModelMessages(contextMessages);
 
