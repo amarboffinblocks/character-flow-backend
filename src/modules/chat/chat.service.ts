@@ -20,8 +20,9 @@ import type {
 import { streamLLM } from './ai/stream-llm.js';
 import { mapProviderToModelProvider } from './ai/model-router.js';
 import { toModelMessages } from './ai/message-converter.js';
+import { addMemories, searchMemories } from '../memory/index.js';
 
-type ChatWithCount = { _count: { messages: number }; [key: string]: unknown };
+type ChatWithCount = { _count: { messages: number };[key: string]: unknown };
 
 /** Max number of prior messages to include as context for the LLM */
 const MAX_HISTORY_MESSAGES = 50;
@@ -249,7 +250,22 @@ export const chatService = {
       .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
       .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
 
-    const messages = toModelMessages(contextMessages);
+    // Retrieve relevant memories from Mem0 (scoped by userId + chatId)
+    const memoryContext = await searchMemories({
+      userId,
+      chatId,
+      query: input.content,
+      limit: 5,
+    });
+
+    const messagesWithMemory = memoryContext.systemPrompt
+      ? [
+        { role: 'system' as const, content: memoryContext.systemPrompt },
+        ...contextMessages,
+      ]
+      : contextMessages;
+
+    const messages = toModelMessages(messagesWithMemory);
 
     const logContext = { chatId, userId, messageId: userMessage.id };
 
@@ -269,6 +285,15 @@ export const chatService = {
           chatId,
           role: 'assistant',
           content: text,
+        });
+        // Persist to Mem0 for future retrieval
+        await addMemories({
+          userId,
+          chatId,
+          messages: [
+            { role: 'user', content: input.content },
+            { role: 'assistant', content: text },
+          ],
         });
       },
 

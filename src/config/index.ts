@@ -55,6 +55,17 @@ const envSchema = z.object({
     AWS_S3_BUCKET: z.string().optional(),
     AWS_S3_ENDPOINT: z.string().optional(), // For S3-compatible services (e.g., DigitalOcean Spaces)
     AWS_S3_CDN_URL: z.string().optional(), // CDN URL for public access (e.g., CloudFront)
+
+    // Mem0 Memory (optional - graceful degradation when not configured)
+    MEM0_ENABLED: z.string().optional().transform((v) => v === 'true' || v === '1'),
+    QDRANT_HOST: z.string().optional(),
+    QDRANT_PORT: z.string().optional(),
+    QDRANT_URL: z.string().optional(),
+    QDRANT_API_KEY: z.string().optional(),
+    MEM0_COLLECTION_NAME: z.string().optional(),
+    MEM0_EMBEDDING_DIMS: z.string().optional(),
+    OPENAI_API_KEY: z.string().optional(),
+    GEMINI_API_KEY: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -136,6 +147,20 @@ export const config = {
             endpoint: env.AWS_S3_ENDPOINT,
             cdnUrl: env.AWS_S3_CDN_URL,
         },
+    },
+
+    memory: {
+        enabled: env.MEM0_ENABLED ?? false,
+        qdrant: {
+            host: env.QDRANT_HOST || 'localhost',
+            port: env.QDRANT_PORT ? parseInt(env.QDRANT_PORT, 10) : 6333,
+            url: env.QDRANT_URL,
+            apiKey: env.QDRANT_API_KEY,
+        },
+        collectionName: env.MEM0_COLLECTION_NAME || 'youruniverse_memories',
+        embeddingDims: env.MEM0_EMBEDDING_DIMS ? parseInt(env.MEM0_EMBEDDING_DIMS, 10) : 768,
+        geminiApiKey: env.GEMINI_API_KEY,
+        openaiApiKey: env.OPENAI_API_KEY,
     },
 } as const;
 
