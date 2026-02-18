@@ -15,6 +15,7 @@ type StreamLLMInput = {
   model?: string;
   messages: ModelMessage[];
   temperature?: number;
+  maxTokens?: number;
   onFinish?: (params: { text: string }) => void | Promise<void>;
   onError?: (params: { error: unknown }) => void;
   /** Called when stream fails midway; receives partial text for persistence */
@@ -28,6 +29,7 @@ export function streamLLM({
   model,
   messages,
   temperature = 0.7,
+  maxTokens,
   onFinish,
   onError,
   onPartialSave,
@@ -43,6 +45,7 @@ export function streamLLM({
     model: aiProvider(modelName),
     messages,
     temperature,
+    ...(maxTokens != null && { maxTokens }),
     experimental_transform: smoothStream(SMOOTH_STREAM_CONFIG),
     onChunk: ({ chunk }) => {
       if (chunk.type === "text-delta" && typeof chunk.text === "string") {

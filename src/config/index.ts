@@ -56,6 +56,12 @@ const envSchema = z.object({
     AWS_S3_ENDPOINT: z.string().optional(), // For S3-compatible services (e.g., DigitalOcean Spaces)
     AWS_S3_CDN_URL: z.string().optional(), // CDN URL for public access (e.g., CloudFront)
 
+    // AI Pipeline (optional - character chat enhancements)
+    AI_PREPROCESSING_ENABLED: z.string().optional().transform((v) => v !== 'false' && v !== '0'),
+    AI_POSTPROCESSING_ENABLED: z.string().optional().transform((v) => v !== 'false' && v !== '0'),
+    AI_SAFETY_BLOCKED_WORDS: z.string().optional(),
+    AI_GUARDRAIL_BLOCKED_PHRASES: z.string().optional(),
+
     // Mem0 Memory (optional - graceful degradation when not configured)
     MEM0_ENABLED: z.string().optional().transform((v) => v === 'true' || v === '1'),
     QDRANT_HOST: z.string().optional(),
@@ -147,6 +153,13 @@ export const config = {
             endpoint: env.AWS_S3_ENDPOINT,
             cdnUrl: env.AWS_S3_CDN_URL,
         },
+    },
+
+    ai: {
+        preprocessingEnabled: env.AI_PREPROCESSING_ENABLED ?? true,
+        postprocessingEnabled: env.AI_POSTPROCESSING_ENABLED ?? true,
+        safetyBlockedWords: env.AI_SAFETY_BLOCKED_WORDS?.split(',').map((w) => w.trim().toLowerCase()).filter(Boolean) ?? ['kill', 'bomb', 'suicide', 'self-harm'],
+        guardrailBlockedPhrases: env.AI_GUARDRAIL_BLOCKED_PHRASES?.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean) ?? ['as an ai', 'language model', 'openai', 'i am an ai', 'i\'m an ai'],
     },
 
     memory: {

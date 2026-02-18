@@ -21,6 +21,8 @@ import { streamLLM } from './ai/stream-llm.js';
 import { mapProviderToModelProvider } from './ai/model-router.js';
 import { toModelMessages } from './ai/message-converter.js';
 import { addMemories, searchMemories } from '../memory/index.js';
+import { runAIOrchestrator } from '../ai/orchestrator/ai-orchestrator.service.js';
+import { postprocessResponse } from '../ai/postprocessor/postprocessor.service.js';
 
 type ChatWithCount = { _count: { messages: number };[key: string]: unknown };
 
@@ -258,33 +260,49 @@ export const chatService = {
       limit: 5,
     });
 
-    const messagesWithMemory = memoryContext.systemPrompt
-      ? [
-        { role: 'system' as const, content: memoryContext.systemPrompt },
-        ...contextMessages,
-      ]
-      : contextMessages;
+    const characterId = (chat as { characterId?: string | null })?.characterId ?? null;
 
-    const messages = toModelMessages(messagesWithMemory);
+    const orchestratorResult = await runAIOrchestrator({
+      chatId,
+      userId,
+      userMessage: input.content,
+      characterId,
+      history: contextMessages,
+      memoryContext: memoryContext.systemPrompt
+        ? { systemPrompt: memoryContext.systemPrompt, memories: memoryContext.memories }
+        : undefined,
+    });
+
+    const messages = toModelMessages(orchestratorResult.messages);
 
     const logContext = { chatId, userId, messageId: userMessage.id };
 
     logger.info(
-      { ...logContext, provider, model: model.modelName, messageCount: messages.length },
+      {
+        ...logContext,
+        provider,
+        model: model.modelName,
+        messageCount: messages.length,
+        characterId: characterId ?? undefined,
+      },
       'Starting LLM stream'
     );
 
+    console.log("message ------------------>", messages)
     const streamResult = streamLLM({
       provider,
       model: model.modelName ?? undefined,
       messages,
+      temperature: orchestratorResult.temperature,
+      maxTokens: orchestratorResult.maxTokens,
       logContext,
 
       onFinish: async ({ text }) => {
+        const processed = postprocessResponse(text);
         await chatRepository.createMessage({
           chatId,
           role: 'assistant',
-          content: text,
+          content: processed,
         });
         // Persist to Mem0 for future retrieval
         await addMemories({
@@ -292,7 +310,7 @@ export const chatService = {
           chatId,
           messages: [
             { role: 'user', content: input.content },
-            { role: 'assistant', content: text },
+            { role: 'assistant', content: processed },
           ],
         });
       },
@@ -302,10 +320,11 @@ export const chatService = {
       },
 
       onPartialSave: async ({ partialText }) => {
+        const processed = postprocessResponse(partialText.trim() || '(Response was interrupted)');
         await chatRepository.createMessage({
           chatId,
           role: 'assistant',
-          content: partialText.trim() || '(Response was interrupted)',
+          content: processed,
         });
       },
     });
