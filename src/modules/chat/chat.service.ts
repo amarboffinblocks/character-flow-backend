@@ -1,4 +1,5 @@
 import { chatRepository } from './chat.repository.js';
+import { characterRepository } from '../character/character.repository.js';
 import { modelService } from '../model/index.js';
 import { modelRepository } from '../model/model.repository.js';
 import { createError } from '../../utils/index.js';
@@ -34,6 +35,27 @@ function withMessageCount<T extends ChatWithCount>(chat: T) {
   return { ...rest, messageCount: _count.messages } as Omit<T, '_count'> & {
     messageCount: number;
   };
+}
+
+/**
+ * Pick first message for new character chat: First Message or random Alternate First Message
+ */
+function pickFirstMessage(
+  firstMessage: string | null | undefined,
+  alternateMessages: string[] | null | undefined
+): string | null {
+  const first = firstMessage?.trim();
+  const alternates = Array.isArray(alternateMessages)
+    ? alternateMessages.filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+    : [];
+
+  const candidates: string[] = [];
+  if (first) candidates.push(first);
+  candidates.push(...alternates);
+
+  if (candidates.length === 0) return null;
+  const picked = candidates[Math.floor(Math.random() * candidates.length)];
+  return picked ?? null;
 }
 
 export const chatService = {
@@ -77,6 +99,22 @@ export const chatService = {
       title: input.title ?? null,
     };
     const chat = await chatRepository.createChat(data);
+
+    // Create first assistant message when chat has a character
+    if (input.characterId) {
+      const character = await characterRepository.findCharacterById(input.characterId);
+      const firstMessageContent = character
+        ? pickFirstMessage(character.firstMessage, character.alternateMessages)
+        : null;
+      if (firstMessageContent) {
+        await chatRepository.createMessage({
+          chatId: chat.id,
+          role: 'assistant',
+          content: firstMessageContent,
+        });
+      }
+    }
+
     return { chat: withMessageCount(chat) };
   },
 
