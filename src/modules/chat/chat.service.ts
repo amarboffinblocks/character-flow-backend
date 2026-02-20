@@ -262,9 +262,11 @@ export const chatService = {
     if (input.trigger === 'regenerate') {
       throw createError.badRequest('Regenerate is not supported in simple chat mode');
     }
+
     if (!input.content?.trim()) {
       throw createError.badRequest('Message content is required');
     }
+
     const created = await chatRepository.createMessage({
       chatId,
       role: 'user',

@@ -26,7 +26,7 @@ function getGoogle() {
 function getAws() {
   if (!_aws)
     _aws = createOpenAICompatible({
-      name: "aws-llm",
+      name: "Qwen/Qwen2.5-7B-Instruct",
       apiKey: process.env.AWS_LLM_API_KEY || "dummy-key",
       baseURL: requireEnv("AWS_LLM_BASE_URL"),
     });

@@ -9,7 +9,7 @@ export const SUPPORTED_PROVIDERS: readonly ModelProvider[] = [
 export const DEFAULT_MODELS: Record<ModelProvider, string> = {
   openai: "gpt-4o-mini",
   gemini: "gemini-2.5-flash",
-  aws: "gpt-4o-mini",
+  aws: "Qwen/Qwen2.5-7B-Instruct",
 };
 
 export function resolveModel(provider: ModelProvider, model?: string | null): string {

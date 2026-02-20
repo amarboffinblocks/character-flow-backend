@@ -26,8 +26,8 @@ function parseIntent(raw: string): IntentType {
 
 export async function detectIntent(message: string): Promise<IntentType> {
   try {
-    const provider = getAIProvider('gemini');
-    const model = resolveModel('gemini', 'gemini-2.5-flash');
+    const provider = getAIProvider('aws');
+    const model = resolveModel('aws', 'Qwen/Qwen2.5-7B-Instruct');
 
     const { text } = await generateText({
       model: provider(model),
