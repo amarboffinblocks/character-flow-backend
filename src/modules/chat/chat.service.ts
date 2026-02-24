@@ -263,14 +263,18 @@ export const chatService = {
       throw createError.badRequest('Regenerate is not supported in simple chat mode');
     }
 
-    if (!input.content?.trim()) {
-      throw createError.badRequest('Message content is required');
+    const hasContent = !!input.content?.trim();
+    const hasAttachments = (input.attachments?.length ?? 0) > 0;
+    if (!hasContent && !hasAttachments) {
+      throw createError.badRequest('Message content or attachments are required');
     }
+
+    const persistedContent = input.content?.trim() || (hasAttachments ? '[Image attached]' : '');
 
     const created = await chatRepository.createMessage({
       chatId,
       role: 'user',
-      content: input.content,
+      content: persistedContent,
     });
     userMessage = {
       id: created.id,
@@ -296,7 +300,7 @@ export const chatService = {
     const memoryContext = await searchMemories({
       userId,
       chatId,
-      query: input.content,
+      query: input.content?.trim() || persistedContent,
       limit: 5,
     });
 
@@ -305,7 +309,8 @@ export const chatService = {
     const orchestratorResult = await runAIOrchestrator({
       chatId,
       userId,
-      userMessage: input.content,
+      userMessage: input.content?.trim() ?? '',
+      userAttachments: input.attachments,
       characterId,
       history: contextMessages,
       memoryContext: memoryContext.systemPrompt
@@ -349,7 +354,7 @@ export const chatService = {
           userId,
           chatId,
           messages: [
-            { role: 'user', content: input.content },
+            { role: 'user', content: persistedContent },
             { role: 'assistant', content: processed },
           ],
         });

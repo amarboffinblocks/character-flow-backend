@@ -73,6 +73,7 @@ export interface UpdateChatData {
 export interface CreateMessageInput {
   content: string;
   role?: 'user' | 'assistant' | 'system';
+  attachments?: Array<{ type: 'file'; url: string; mediaType?: string; filename?: string }>;
 }
 
 export interface MessageQueryParams {

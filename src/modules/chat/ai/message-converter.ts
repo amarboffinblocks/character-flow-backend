@@ -1,7 +1,6 @@
 import type { ModelMessage } from "ai";
+import type { ChatMessage } from "../../ai/ai.types.js";
 
-export function toModelMessages(
-  msgs: { role: "user" | "assistant" | "system"; content: string }[]
-): ModelMessage[] {
-  return msgs.map((m): ModelMessage => ({ role: m.role, content: m.content }));
+export function toModelMessages(msgs: ChatMessage[]): ModelMessage[] {
+  return msgs.map((m) => ({ role: m.role, content: m.content } as ModelMessage));
 }

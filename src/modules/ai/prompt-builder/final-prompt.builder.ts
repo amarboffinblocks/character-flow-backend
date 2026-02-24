@@ -25,6 +25,43 @@ function buildSystemParts(input: BuildMessagesInput): string[] {
   return parts;
 }
 
+function buildUserMessageContent(
+  userMessage: string,
+  userAttachments?: BuildMessagesInput['userAttachments']
+): ChatMessage['content'] {
+  const hasAttachments = userAttachments && userAttachments.length > 0;
+  const imageAttachments = hasAttachments
+    ? userAttachments!.filter((a) => a.mediaType?.startsWith('image/'))
+    : [];
+  const nonImageAttachments = hasAttachments
+    ? userAttachments!.filter((a) => !a.mediaType?.startsWith('image/'))
+    : [];
+
+  if (!hasAttachments || imageAttachments.length === 0) {
+    if (nonImageAttachments.length > 0) {
+      const fileLabels = nonImageAttachments.map((f) => `[File: ${f.filename || 'attachment'}]`).join(' ');
+      return `${userMessage.trim() || ''} ${fileLabels}`.trim() || '[Attachments]';
+    }
+    return userMessage;
+  }
+
+  const textContent = userMessage.trim() || 'Describe or respond to the attached image(s).';
+  const parts: Array<{ type: 'text'; text: string } | { type: 'image'; image: string; mediaType?: string }> = [
+    { type: 'text', text: textContent },
+  ];
+
+  for (const img of imageAttachments) {
+    parts.push({ type: 'image', image: img.url, mediaType: img.mediaType });
+  }
+
+  if (nonImageAttachments.length > 0) {
+    const fileLabels = nonImageAttachments.map((f) => `[File: ${f.filename || 'attachment'}]`).join(' ');
+    parts.push({ type: 'text', text: ` ${fileLabels}` });
+  }
+
+  return parts;
+}
+
 export function buildFinalMessages(input: BuildMessagesInput): ChatMessage[] {
   const systemParts = buildSystemParts(input);
   const systemContent = systemParts.join('\n\n');
@@ -37,7 +74,8 @@ export function buildFinalMessages(input: BuildMessagesInput): ChatMessage[] {
     }
   }
 
-  messages.push({ role: 'user', content: input.userMessage });
+  const userContent = buildUserMessageContent(input.userMessage, input.userAttachments);
+  messages.push({ role: 'user', content: userContent });
 
   return messages;
 }

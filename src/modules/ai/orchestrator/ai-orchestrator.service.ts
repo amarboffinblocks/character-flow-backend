@@ -42,7 +42,7 @@ async function buildSimpleChatResult(
   input: AIOrchestratorInput,
   preprocess: Awaited<ReturnType<typeof preprocessMessage>>
 ): Promise<AIOrchestratorResult> {
-  const { history, userMessage, memoryContext } = input;
+  const { history, userMessage, userAttachments, memoryContext } = input;
 
   const systemParts: string[] = [];
 
@@ -63,6 +63,7 @@ async function buildSimpleChatResult(
     loreContext: undefined,
     history,
     userMessage,
+    userAttachments,
   });
 
   return {
@@ -83,7 +84,7 @@ async function buildCharacterChatResult(
   input: AIOrchestratorInput,
   preprocess: Awaited<ReturnType<typeof preprocessMessage>>
 ): Promise<AIOrchestratorResult> {
-  const { characterId, history, userMessage, memoryContext } = input;
+  const { characterId, history, userMessage, userAttachments, memoryContext } = input;
 
   if (!characterId) throw createError.badRequest('Character ID is required');
 
@@ -134,6 +135,7 @@ async function buildCharacterChatResult(
     loreContext: characterContext.loreContext || undefined,
     history,
     userMessage,
+    userAttachments,
   });
 
   return {

@@ -55,18 +55,30 @@ export const chatQuerySchema = z.object({
 // Message Schemas
 // ============================================
 
-export const createMessageSchema = z.object({
-  content: z.string().max(10000, 'Message content is too long').optional(),
-  role: z.enum(['user', 'assistant', 'system']).optional().default('user'),
-  trigger: z.enum(['regenerate']).optional(),
-  messageId: z.string().uuid().optional(),
-}).refine(
-  (data) => {
-    if (data.trigger === 'regenerate') return !!data.messageId;
-    return !!data.content && data.content.length > 0;
-  },
-  { message: 'Either content (for new message) or trigger+messageId (for regenerate) is required' }
-);
+const attachmentSchema = z.object({
+  type: z.literal('file'),
+  url: z.string(),
+  mediaType: z.string().optional(),
+  filename: z.string().optional(),
+});
+
+export const createMessageSchema = z
+  .object({
+    content: z.string().max(10000, 'Message content is too long').optional(),
+    role: z.enum(['user', 'assistant', 'system']).optional().default('user'),
+    trigger: z.enum(['regenerate']).optional(),
+    messageId: z.string().uuid().optional(),
+    attachments: z.array(attachmentSchema).optional().default([]),
+  })
+  .refine(
+    (data) => {
+      if (data.trigger === 'regenerate') return !!data.messageId;
+      const hasContent = !!data.content && data.content.length > 0;
+      const hasAttachments = (data.attachments?.length ?? 0) > 0;
+      return hasContent || hasAttachments;
+    },
+    { message: 'Either content, attachments, or trigger+messageId (for regenerate) is required' }
+  );
 
 export const messageQuerySchema = z.object({
   page: z.preprocess(

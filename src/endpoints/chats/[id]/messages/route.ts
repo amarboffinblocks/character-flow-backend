@@ -22,6 +22,7 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
     role: validated.role,
     trigger: validated.trigger,
     messageId: validated.messageId,
+    attachments: validated.attachments,
   });
 
   res.setHeader('X-User-Message-Id', userMessage.id);

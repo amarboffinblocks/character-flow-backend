@@ -82,10 +82,24 @@ export interface ResponsePlan {
 // Prompt Building
 // ============================================
 
+export type ChatMessageContent =
+  | string
+  | Array<
+      | { type: 'text'; text: string }
+      | { type: 'image'; image: string; mediaType?: string }
+    >;
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: ChatMessageContent;
 }
+
+export type UserAttachment = {
+  type: 'file';
+  url: string;
+  mediaType?: string;
+  filename?: string;
+};
 
 export interface BuildMessagesInput {
   systemPrompt: string;
@@ -94,6 +108,7 @@ export interface BuildMessagesInput {
   loreContext?: string;
   history: ChatMessage[];
   userMessage: string;
+  userAttachments?: UserAttachment[];
 }
 
 // ============================================
@@ -104,6 +119,7 @@ export interface AIOrchestratorInput {
   chatId: string;
   userId: string;
   userMessage: string;
+  userAttachments?: UserAttachment[];
   characterId: string | null;
   history: ChatMessage[];
   memoryContext?: { systemPrompt: string; memories?: unknown[] };
