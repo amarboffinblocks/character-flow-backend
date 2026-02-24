@@ -10,9 +10,12 @@ export const chatRepository = {
   async findChatById(id: string, options?: { includeMessages?: boolean }): Promise<Chat | (Chat & { messages: Array<{ id: string; role: string; content: string; createdAt: Date }> }) | null> {
     return prisma.chat.findUnique({
       where: { id },
-      include: options?.includeMessages
-        ? { messages: { orderBy: { createdAt: 'asc' } } }
-        : undefined,
+      include: {
+        character: { select: { id: true, name: true, avatar: true } },
+        ...(options?.includeMessages
+          ? { messages: { orderBy: { createdAt: 'asc' } } }
+          : {}),
+      },
     }) as Promise<Chat | (Chat & { messages: Array<{ id: string; role: string; content: string; createdAt: Date }> }) | null>;
   },
 
@@ -24,6 +27,7 @@ export const chatRepository = {
     return prisma.chat.findFirst({
       where: { id, userId },
       include: {
+        character: { select: { id: true, name: true, avatar: true } },
         _count: { select: { messages: true } },
         ...(options?.includeMessages ? { messages: { orderBy: { createdAt: 'asc' } } } : {}),
       },
@@ -66,6 +70,7 @@ export const chatRepository = {
         ...(take !== undefined && { take }),
         orderBy,
         include: {
+          character: { select: { id: true, name: true, avatar: true } },
           _count: { select: { messages: true } },
         },
       }),
@@ -103,6 +108,7 @@ export const chatRepository = {
       where: { id },
       data: updatePayload,
       include: {
+        character: { select: { id: true, name: true, avatar: true } },
         _count: { select: { messages: true } },
       },
     });
@@ -118,6 +124,7 @@ export const chatRepository = {
       where: { id },
       data: { isActive },
       include: {
+        character: { select: { id: true, name: true, avatar: true } },
         _count: { select: { messages: true } },
       },
     });
@@ -129,6 +136,7 @@ export const chatRepository = {
       where: { id },
       data: { isPinned },
       include: {
+        character: { select: { id: true, name: true, avatar: true } },
         _count: { select: { messages: true } },
       },
     });
