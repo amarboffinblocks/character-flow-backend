@@ -259,8 +259,12 @@ export const chatService = {
     let userMessage: SendMessageStreamResponse['userMessage'];
     let contextMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
 
-    if (input.trigger === 'regenerate') {
-      throw createError.badRequest('Regenerate is not supported in simple chat mode');
+    if (input.trigger === 'regenerate' && input.messageId) {
+      return this.regenerateAssistantMessage(chatId, userId, input.messageId, {
+        chat,
+        model,
+        provider,
+      });
     }
 
     const hasContent = !!input.content?.trim();
@@ -333,7 +337,6 @@ export const chatService = {
       'Starting LLM stream'
     );
 
-    console.log("message ------------------>", messages)
     const streamResult = streamLLM({
       provider,
       model: model.modelName ?? undefined,
@@ -373,6 +376,147 @@ export const chatService = {
         });
       },
     });
+
+    return {
+      userMessage,
+      streamResult: streamResult as SendMessageStreamResponse['streamResult'],
+    };
+  },
+
+  // ============================================
+  // Regenerate Assistant Message
+  // ============================================
+
+  async regenerateAssistantMessage(
+    chatId: string,
+    userId: string,
+    assistantMessageId: string,
+    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null }; provider: ReturnType<typeof mapProviderToModelProvider> }
+  ): Promise<SendMessageStreamResponse> {
+    const { chat, model, provider } = ctx;
+
+    const assistantMsg = await chatRepository.findMessageById(assistantMessageId);
+    if (!assistantMsg) {
+      throw createError.notFound('Message not found');
+    }
+    if (assistantMsg.chatId !== chatId) {
+      throw createError.notFound('Message not found');
+    }
+    if (assistantMsg.role !== 'assistant') {
+      throw createError.badRequest('Can only regenerate assistant messages');
+    }
+
+    const { messages: allMessages } = await chatRepository.findMessagesByChat(chatId, {
+      limit: MAX_HISTORY_MESSAGES,
+      sortOrder: 'asc',
+    });
+
+    const assistantIndex = allMessages.findIndex((m) => m.id === assistantMessageId);
+    if (assistantIndex < 0) {
+      throw createError.notFound('Message not found in chat');
+    }
+    if (assistantIndex === 0) {
+      throw createError.badRequest('No user message to regenerate from');
+    }
+
+    const userMsg = allMessages[assistantIndex - 1];
+    if (!userMsg) {
+      throw createError.badRequest('User message not found');
+    }
+    if (userMsg.role !== 'user') {
+      throw createError.badRequest('Previous message must be from user');
+    }
+
+    await chatRepository.deleteMessage(assistantMessageId);
+
+    const contextMessages = allMessages
+      .slice(0, assistantIndex)
+      .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
+      .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+
+    const memoryContext = await searchMemories({
+      userId,
+      chatId,
+      query: userMsg.content ?? '',
+      limit: 5,
+    });
+
+    const characterId = (chat as { characterId?: string | null })?.characterId ?? null;
+
+    const orchestratorResult = await runAIOrchestrator({
+      chatId,
+      userId,
+      userMessage: userMsg.content ?? '',
+      userAttachments: [],
+      characterId,
+      history: contextMessages,
+      memoryContext: memoryContext.systemPrompt
+        ? { systemPrompt: memoryContext.systemPrompt, memories: memoryContext.memories }
+        : undefined,
+    });
+
+    const messages = toModelMessages(orchestratorResult.messages);
+    const logContext = { chatId, userId, messageId: userMsg.id };
+
+    logger.info(
+      {
+        ...logContext,
+        provider: model.provider,
+        model: model.modelName,
+        messageCount: messages.length,
+        characterId: characterId ?? undefined,
+      },
+      'Regenerating assistant message'
+    );
+
+    const streamResult = streamLLM({
+      provider,
+      model: model.modelName ?? undefined,
+      messages,
+      temperature: orchestratorResult.temperature,
+      maxTokens: orchestratorResult.maxTokens,
+      logContext,
+
+      onFinish: async ({ text }) => {
+        const processed = postprocessResponse(text);
+        await chatRepository.createMessage({
+          chatId,
+          role: 'assistant',
+          content: processed,
+        });
+        await addMemories({
+          userId,
+          chatId,
+          messages: [
+            { role: 'user', content: userMsg.content ?? '' },
+            { role: 'assistant', content: processed },
+          ],
+        });
+      },
+
+      onError: () => {
+        // Error already logged in stream-llm
+      },
+
+      onPartialSave: async ({ partialText }) => {
+        const processed = postprocessResponse(partialText.trim() || '(Response was interrupted)');
+        await chatRepository.createMessage({
+          chatId,
+          role: 'assistant',
+          content: processed,
+        });
+      },
+    });
+
+    const userMessage = {
+      id: userMsg.id,
+      chatId,
+      role: userMsg.role,
+      content: userMsg.content ?? '',
+      tokensUsed: userMsg.tokensUsed ?? null,
+      metadata: userMsg.metadata ?? null,
+      createdAt: userMsg.createdAt,
+    };
 
     return {
       userMessage,

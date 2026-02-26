@@ -33,13 +33,13 @@ const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
  *   /characters/[id]/favorite/route.ts -> /characters/:id/favorite
  */
 const filePathToRoutePath = (filePath: string): string => {
-  // Handle root route.ts file
-  if (filePath === 'route.ts') {
+  // Handle root route file
+  if (filePath === 'route.ts' || filePath === 'route.js') {
     return '/';
   }
 
-  // Remove 'route.ts' from the end (handles both /route.ts and route.ts)
-  let routePath = filePath.replace(/\/?route\.ts$/, '');
+  // Remove 'route.ts' or 'route.js' from the end (handles both dev and production)
+  let routePath = filePath.replace(/\/?route\.(ts|js)$/, '');
 
   // Convert [param] to :param (Next.js style dynamic routes)
   routePath = routePath.replace(/\[([^\]]+)\]/g, ':$1');
@@ -58,7 +58,8 @@ const filePathToRoutePath = (filePath: string): string => {
 };
 
 /**
- * Recursively finds all route.ts files in a directory
+ * Recursively finds all route.ts or route.js files in a directory
+ * Supports both dev (tsx) and production (compiled .js)
  */
 const findRouteFiles = (dir: string, baseDir: string = dir): string[] => {
   const files: string[] = [];
@@ -75,7 +76,7 @@ const findRouteFiles = (dir: string, baseDir: string = dir): string[] => {
 
     if (stat.isDirectory()) {
       files.push(...findRouteFiles(fullPath, baseDir));
-    } else if (entry === 'route.ts') {
+    } else if (entry === 'route.ts' || entry === 'route.js') {
       const relativePath = relative(baseDir, fullPath);
       files.push(relativePath);
     }
@@ -85,13 +86,15 @@ const findRouteFiles = (dir: string, baseDir: string = dir): string[] => {
 };
 
 /**
- * Loads middleware from a middleware.ts file if it exists
+ * Loads middleware from a middleware.ts or middleware.js file if it exists
  * Supports both method-specific middleware (Record<string, RequestHandler[]>) and general middleware (RequestHandler[])
  */
 const loadMiddleware = async (dir: string): Promise<RequestHandler[] | Record<string, RequestHandler[]>> => {
-  const middlewarePath = join(dir, 'middleware.ts');
+  const middlewarePathTs = join(dir, 'middleware.ts');
+  const middlewarePathJs = join(dir, 'middleware.js');
+  const middlewarePath = existsSync(middlewarePathTs) ? middlewarePathTs : existsSync(middlewarePathJs) ? middlewarePathJs : null;
 
-  if (!existsSync(middlewarePath)) {
+  if (!middlewarePath) {
     return [];
   }
 
@@ -133,7 +136,7 @@ export const createFileRouter = async (endpointsDir: string, basePath: string = 
   for (const routeFile of routeFiles) {
     const fullPath = join(absoluteDir, routeFile);
     const routePath = filePathToRoutePath(routeFile);
-    const routeDir = join(absoluteDir, routeFile.replace(/\/route\.ts$/, ''));
+    const routeDir = join(absoluteDir, routeFile.replace(/\/route\.(ts|js)$/, ''));
 
     try {
       // Load route module

@@ -237,6 +237,12 @@ export const chatRepository = {
     return { messages, total };
   },
 
+  async findMessageById(id: string, chatId?: string) {
+    const where: { id: string; chatId?: string } = { id };
+    if (chatId) where.chatId = chatId;
+    return prisma.message.findFirst({ where });
+  },
+
   async deleteMessage(id: string) {
     await prisma.message.delete({ where: { id } });
   },

@@ -62,3 +62,15 @@ export const personaImageUpload = multer({
   { name: 'avatar', maxCount: 1 },
   { name: 'backgroundImage', maxCount: 1 },
 ]);
+
+// Multer instance for background image uploads
+export const backgroundImageUpload = multer({
+  storage,
+  limits: {
+    fileSize: UPLOAD_CONSTANTS.MAX_SIZE,
+    files: 1, // image only
+  },
+  fileFilter,
+}).fields([
+  { name: 'image', maxCount: 1 },
+]);

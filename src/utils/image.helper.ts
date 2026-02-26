@@ -46,7 +46,7 @@ export const validateImageFile = (file: Express.Multer.File | undefined): void =
  */
 export const processImageUpload = async (
   file: Express.Multer.File | undefined,
-  folder: 'characters' | 'lorebooks' | 'personas' | 'realms' = 'characters'
+  folder: 'characters' | 'lorebooks' | 'personas' | 'realms' | 'backgrounds' = 'characters'
 ): Promise<ImageMetadata | null> => {
   if (!file) {
     return null;
@@ -99,7 +99,7 @@ export const processImageUpload = async (
  */
 export const processMultipleImageUploads = async (
   files: Express.Multer.File[] | undefined,
-  folder: 'characters' | 'lorebooks' | 'personas' | 'realms' = 'characters'
+  folder: 'characters' | 'lorebooks' | 'personas' | 'realms' | 'backgrounds' = 'characters'
 ): Promise<ImageMetadata[]> => {
   if (!files || files.length === 0) {
     return [];
