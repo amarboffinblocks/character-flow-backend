@@ -38,24 +38,24 @@ function withMessageCount<T extends ChatWithCount>(chat: T) {
 }
 
 /**
- * Pick first message for new character chat: First Message or random Alternate First Message
+ * Build all first message versions for character chat: firstMessage + alternateMessages.
+ * Returns { content, versions } for storage. content is the primary (first) display.
  */
-function pickFirstMessage(
+function buildFirstMessageVersions(
   firstMessage: string | null | undefined,
   alternateMessages: string[] | null | undefined
-): string | null {
+): { content: string; versions: string[] } | null {
   const first = firstMessage?.trim();
   const alternates = Array.isArray(alternateMessages)
     ? alternateMessages.filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
     : [];
 
-  const candidates: string[] = [];
-  if (first) candidates.push(first);
-  candidates.push(...alternates);
+  const versions: string[] = [];
+  if (first) versions.push(first);
+  versions.push(...alternates);
 
-  if (candidates.length === 0) return null;
-  const picked = candidates[Math.floor(Math.random() * candidates.length)];
-  return picked ?? null;
+  if (versions.length === 0) return null;
+  return { content: versions[0]!, versions };
 }
 
 export const chatService = {
@@ -103,14 +103,15 @@ export const chatService = {
     // Create first assistant message when chat has a character
     if (input.characterId) {
       const character = await characterRepository.findCharacterById(input.characterId);
-      const firstMessageContent = character
-        ? pickFirstMessage(character.firstMessage, character.alternateMessages)
+      const firstMessageData = character
+        ? buildFirstMessageVersions(character.firstMessage, character.alternateMessages)
         : null;
-      if (firstMessageContent) {
+      if (firstMessageData) {
         await chatRepository.createMessage({
           chatId: chat.id,
           role: 'assistant',
-          content: firstMessageContent,
+          content: firstMessageData.content,
+          metadata: { versions: firstMessageData.versions },
         });
       }
     }
