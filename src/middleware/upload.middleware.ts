@@ -74,3 +74,15 @@ export const backgroundImageUpload = multer({
 }).fields([
   { name: 'image', maxCount: 1 },
 ]);
+
+// Multer instance for realm image uploads
+export const realmImageUpload = multer({
+  storage,
+  limits: {
+    fileSize: UPLOAD_CONSTANTS.MAX_SIZE,
+    files: 1, // avatar only
+  },
+  fileFilter,
+}).fields([
+  { name: 'avatar', maxCount: 1 },
+]);
