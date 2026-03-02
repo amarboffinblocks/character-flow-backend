@@ -130,6 +130,7 @@ export const updateProfileSchema = z.object({
   tagsToAvoid: z.array(z.string()).optional(),
   profileVisibility: z.enum(['public', 'private']).optional(),
   profileRating: z.enum(['SFW', 'NSFW']).optional(),
+  subscriptionPlan: z.enum(['adventurer', 'explorer', 'voyager', 'pioneer']).optional(),
 });
 
 export const resetPasswordSchema = z.object({

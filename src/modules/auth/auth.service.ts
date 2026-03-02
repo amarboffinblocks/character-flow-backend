@@ -616,6 +616,7 @@ export const authService = {
       tagsToAvoid?: string[];
       profileVisibility?: 'public' | 'private';
       profileRating?: 'SFW' | 'NSFW';
+      subscriptionPlan?: 'adventurer' | 'explorer' | 'voyager' | 'pioneer';
     }
   ): Promise<UserWithoutPassword> {
     const user = await authRepository.findUserById(userId);

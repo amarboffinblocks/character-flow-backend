@@ -100,6 +100,7 @@ export const authRepository = {
       tagsToAvoid?: string[];
       profileVisibility?: 'public' | 'private';
       profileRating?: 'SFW' | 'NSFW';
+      subscriptionPlan?: 'adventurer' | 'explorer' | 'voyager' | 'pioneer';
     }
   ): Promise<User> {
     return prisma.user.update({
@@ -116,6 +117,7 @@ export const authRepository = {
         ...(data.tagsToAvoid !== undefined && { tagsToAvoid: data.tagsToAvoid }),
         ...(data.profileVisibility && { profileVisibility: data.profileVisibility }),
         ...(data.profileRating && { profileRating: data.profileRating }),
+        ...(data.subscriptionPlan && { subscriptionPlan: data.subscriptionPlan }),
       },
     });
   },
