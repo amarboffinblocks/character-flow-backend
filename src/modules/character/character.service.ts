@@ -2,6 +2,11 @@ import { characterRepository } from './character.repository.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { prisma } from '../../lib/prisma.js';
+import {
+  deleteFromS3IfExists,
+  transformEntityImageUrls,
+  transformEntitiesImageUrls,
+} from '../../lib/s3.service.js';
 import type {
   CreateCharacterInput,
   UpdateCharacterInput,
@@ -104,7 +109,7 @@ export const characterService = {
 
     const character = await characterRepository.createCharacter(characterData);
 
-    return { character };
+    return { character: await transformEntityImageUrls(character) };
   },
 
   // ============================================
@@ -123,7 +128,7 @@ export const characterService = {
       throw createError.forbidden('Character is private');
     }
 
-    return { character };
+    return { character: await transformEntityImageUrls(character) };
   },
 
   // ============================================
@@ -142,7 +147,7 @@ export const characterService = {
       throw createError.forbidden('Character is private');
     }
 
-    return { character };
+    return { character: await transformEntityImageUrls(character) };
   },
 
   // ============================================
@@ -157,7 +162,7 @@ export const characterService = {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      characters,
+      characters: await transformEntitiesImageUrls(characters),
       pagination: {
         page,
         limit,
@@ -179,7 +184,7 @@ export const characterService = {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      characters,
+      characters: await transformEntitiesImageUrls(characters),
       pagination: {
         page,
         limit,
@@ -275,6 +280,33 @@ export const characterService = {
       authorName = user?.name ?? null;
     }
 
+    // Delete old S3 images when replacing with new uploads
+    if (input.avatar !== undefined && input.avatar !== null) {
+      const oldAvatar = existingCharacter.avatar as { url?: string } | null;
+      if (oldAvatar?.url) {
+        await deleteFromS3IfExists(oldAvatar.url);
+      }
+    }
+    if (input.backgroundImg !== undefined && input.backgroundImg !== null) {
+      const oldBackground = existingCharacter.backgroundImg as { url?: string } | null;
+      if (oldBackground?.url) {
+        await deleteFromS3IfExists(oldBackground.url);
+      }
+    }
+    // Also delete when explicitly setting to null (removing image)
+    if (input.avatar === null) {
+      const oldAvatar = existingCharacter.avatar as { url?: string } | null;
+      if (oldAvatar?.url) {
+        await deleteFromS3IfExists(oldAvatar.url);
+      }
+    }
+    if (input.backgroundImg === null) {
+      const oldBackground = existingCharacter.backgroundImg as { url?: string } | null;
+      if (oldBackground?.url) {
+        await deleteFromS3IfExists(oldBackground.url);
+      }
+    }
+
     const updateData: UpdateCharacterData = {
       ...(input.name && { name: input.name }),
       ...(slug && { slug }),
@@ -301,7 +333,7 @@ export const characterService = {
 
     const character = await characterRepository.updateCharacter(id, updateData);
 
-    return { character };
+    return { character: await transformEntityImageUrls(character) };
   },
 
   // ============================================
@@ -319,6 +351,12 @@ export const characterService = {
     if (character.userId !== userId) {
       throw createError.forbidden('You do not have permission to delete this character');
     }
+
+    // Delete associated images from S3
+    const avatar = character.avatar as { url?: string } | null;
+    const backgroundImg = character.backgroundImg as { url?: string } | null;
+    if (avatar?.url) await deleteFromS3IfExists(avatar.url);
+    if (backgroundImg?.url) await deleteFromS3IfExists(backgroundImg.url);
 
     await characterRepository.deleteCharacter(id);
 
@@ -344,7 +382,7 @@ export const characterService = {
       isFavourite: !character.isFavourite,
     });
 
-    return { character: updatedCharacter };
+    return { character: await transformEntityImageUrls(updatedCharacter) };
   },
 
   // ============================================
@@ -366,7 +404,7 @@ export const characterService = {
       isSaved: !character.isSaved,
     });
 
-    return { character: updatedCharacter };
+    return { character: await transformEntityImageUrls(updatedCharacter) };
   },
 
   // ============================================
@@ -445,7 +483,7 @@ export const characterService = {
 
     const duplicatedCharacter = await characterRepository.createCharacter(characterData);
 
-    return { character: duplicatedCharacter };
+    return { character: await transformEntityImageUrls(duplicatedCharacter) };
   },
 
   // ============================================
@@ -547,7 +585,7 @@ export const characterService = {
       duplicatedCharacters.push(duplicatedCharacter);
     }
 
-    return { characters: duplicatedCharacters };
+    return { characters: await transformEntitiesImageUrls(duplicatedCharacters) };
   },
 
   // ============================================
@@ -695,7 +733,7 @@ export const characterService = {
     };
 
     const character = await characterRepository.createCharacter(createData);
-    return { character };
+    return { character: await transformEntityImageUrls(character) };
   },
 
   // ============================================
@@ -799,7 +837,10 @@ export const characterService = {
       }
     }
 
-    return results;
+    return {
+      ...results,
+      characters: await transformEntitiesImageUrls(results.characters),
+    };
   },
 };
 

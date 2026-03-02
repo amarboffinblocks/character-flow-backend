@@ -2,6 +2,11 @@ import { personaRepository } from './persona.repository.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { processImageUpload } from '../../utils/image.helper.js';
+import {
+  deleteFromS3IfExists,
+  transformEntityImageUrls,
+  transformEntitiesImageUrls,
+} from '../../lib/s3.service.js';
 import type {
   CreatePersonaInput,
   UpdatePersonaInput,
@@ -66,7 +71,7 @@ export const personaService = {
       throw createError.notFound('Persona not found after creation');
     }
 
-    return { persona: personaWithRelations };
+    return { persona: await transformEntityImageUrls(personaWithRelations) };
   },
 
   // ============================================
@@ -85,7 +90,7 @@ export const personaService = {
       throw createError.forbidden('You do not have access to this persona');
     }
 
-    return { persona };
+    return { persona: await transformEntityImageUrls(persona) };
   },
 
   // ============================================
@@ -104,7 +109,7 @@ export const personaService = {
       throw createError.forbidden('You do not have access to this persona');
     }
 
-    return { persona };
+    return { persona: await transformEntityImageUrls(persona) };
   },
 
   // ============================================
@@ -120,7 +125,7 @@ export const personaService = {
     const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
 
     return {
-      personas,
+      personas: await transformEntitiesImageUrls(personas),
       pagination: {
         page,
         limit,
@@ -142,7 +147,7 @@ export const personaService = {
     const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
 
     return {
-      personas,
+      personas: await transformEntitiesImageUrls(personas),
       pagination: {
         page,
         limit,
@@ -170,6 +175,24 @@ export const personaService = {
 
     if (existingPersona.userId !== userId) {
       throw createError.forbidden('You do not have permission to update this persona');
+    }
+
+    // Delete old S3 images when replacing
+    if (input.avatar !== undefined && input.avatar !== null) {
+      const oldAvatar = existingPersona.avatar as { url?: string } | null;
+      if (oldAvatar?.url) await deleteFromS3IfExists(oldAvatar.url);
+    }
+    if (input.avatar === null) {
+      const oldAvatar = existingPersona.avatar as { url?: string } | null;
+      if (oldAvatar?.url) await deleteFromS3IfExists(oldAvatar.url);
+    }
+    if (input.backgroundImg !== undefined && input.backgroundImg !== null) {
+      const oldBg = existingPersona.backgroundImg as { url?: string } | null;
+      if (oldBg?.url) await deleteFromS3IfExists(oldBg.url);
+    }
+    if (input.backgroundImg === null) {
+      const oldBg = existingPersona.backgroundImg as { url?: string } | null;
+      if (oldBg?.url) await deleteFromS3IfExists(oldBg.url);
     }
 
     // Generate new slug if name is being updated
@@ -211,7 +234,7 @@ export const personaService = {
       throw createError.notFound('Persona not found after update');
     }
 
-    return { persona: updatedPersona };
+    return { persona: await transformEntityImageUrls(updatedPersona) };
   },
 
   // ============================================
@@ -229,6 +252,12 @@ export const personaService = {
     if (persona.userId !== userId) {
       throw createError.forbidden('You do not have permission to delete this persona');
     }
+
+    // Delete images from S3
+    const avatar = persona.avatar as { url?: string } | null;
+    const backgroundImg = persona.backgroundImg as { url?: string } | null;
+    if (avatar?.url) await deleteFromS3IfExists(avatar.url);
+    if (backgroundImg?.url) await deleteFromS3IfExists(backgroundImg.url);
 
     // Delete persona
     await personaRepository.deletePersona(id);
@@ -290,7 +319,7 @@ export const personaService = {
     // Toggle favourite
     const updatedPersona = await personaRepository.toggleFavourite(id);
 
-    return { persona: updatedPersona };
+    return { persona: await transformEntityImageUrls(updatedPersona) };
   },
 
   // ============================================
@@ -368,7 +397,7 @@ export const personaService = {
       throw createError.notFound('Persona not found after duplication');
     }
 
-    return { persona: personaWithRelations };
+    return { persona: await transformEntityImageUrls(personaWithRelations) };
   },
 
   // ============================================
@@ -403,7 +432,10 @@ export const personaService = {
       }
     }
 
-    return results;
+    return {
+      ...results,
+      personas: await transformEntitiesImageUrls(results.personas),
+    };
   },
 
   // ============================================
@@ -466,7 +498,7 @@ export const personaService = {
       throw createError.notFound('Persona not found after import');
     }
 
-    return { persona: personaWithRelations };
+    return { persona: await transformEntityImageUrls(personaWithRelations) };
   },
 
   // ============================================
@@ -503,6 +535,9 @@ export const personaService = {
       }
     }
 
-    return results;
+    return {
+      ...results,
+      personas: await transformEntitiesImageUrls(results.personas),
+    };
   },
 };

@@ -131,6 +131,8 @@ export const updateProfileSchema = z.object({
   profileVisibility: z.enum(['public', 'private']).optional(),
   profileRating: z.enum(['SFW', 'NSFW']).optional(),
   subscriptionPlan: z.enum(['adventurer', 'explorer', 'voyager', 'pioneer']).optional(),
+  avatar: z.record(z.string(), z.unknown()).optional().nullable(),
+  backgroundImg: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 export const resetPasswordSchema = z.object({

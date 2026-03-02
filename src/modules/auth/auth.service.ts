@@ -15,6 +15,10 @@ import { emailService } from '../../lib/email.service.js';
 import { smsService } from '../../lib/sms.service.js';
 import { logger } from '../../lib/logger.js';
 import { config } from '../../config/index.js';
+import {
+  deleteFromS3IfExists,
+  transformEntityImageUrls,
+} from '../../lib/s3.service.js';
 import type {
   RegisterInput,
   LoginInput,
@@ -259,7 +263,7 @@ export const authService = {
     logger.info({ userId: user.id }, 'User logged in successfully with 2FA');
 
     return {
-      user: safeUser,
+      user: await transformEntityImageUrls(safeUser),
       tokens,
     };
   },
@@ -595,7 +599,8 @@ export const authService = {
       throw createError.notFound('User not found');
     }
 
-    return omit(user, ['password']);
+    const safeUser = omit(user, ['password']);
+    return await transformEntityImageUrls(safeUser);
   },
 
   // ============================================
@@ -617,6 +622,8 @@ export const authService = {
       profileVisibility?: 'public' | 'private';
       profileRating?: 'SFW' | 'NSFW';
       subscriptionPlan?: 'adventurer' | 'explorer' | 'voyager' | 'pioneer';
+      avatar?: Record<string, unknown> | null;
+      backgroundImg?: Record<string, unknown> | null;
     }
   ): Promise<UserWithoutPassword> {
     const user = await authRepository.findUserById(userId);
@@ -635,6 +642,24 @@ export const authService = {
       await safeAsync(() => usernameService.invalidateCache(user.username));
     }
 
+    // Delete old S3 images when replacing
+    if (data.avatar !== undefined && data.avatar !== null) {
+      const oldAvatar = user.avatar as { url?: string } | null;
+      if (oldAvatar?.url) await deleteFromS3IfExists(oldAvatar.url);
+    }
+    if (data.avatar === null) {
+      const oldAvatar = user.avatar as { url?: string } | null;
+      if (oldAvatar?.url) await deleteFromS3IfExists(oldAvatar.url);
+    }
+    if (data.backgroundImg !== undefined && data.backgroundImg !== null) {
+      const oldBg = user.backgroundImg as { url?: string } | null;
+      if (oldBg?.url) await deleteFromS3IfExists(oldBg.url);
+    }
+    if (data.backgroundImg === null) {
+      const oldBg = user.backgroundImg as { url?: string } | null;
+      if (oldBg?.url) await deleteFromS3IfExists(oldBg.url);
+    }
+
     // Update user
     const updatedUser = await authRepository.updateUser(userId, data);
 
@@ -644,7 +669,8 @@ export const authService = {
       await safeAsync(() => usernameService.invalidateCache(newUsername));
     }
 
-    return omit(updatedUser, ['password']);
+    const safeUser = omit(updatedUser, ['password']);
+    return await transformEntityImageUrls(safeUser);
   },
 };
 

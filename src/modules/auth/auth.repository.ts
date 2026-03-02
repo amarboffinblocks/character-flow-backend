@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import type { User } from '@prisma/client';
 import type { CreateUserData, SessionData, TokenData } from './auth.types.js';
@@ -101,6 +102,8 @@ export const authRepository = {
       profileVisibility?: 'public' | 'private';
       profileRating?: 'SFW' | 'NSFW';
       subscriptionPlan?: 'adventurer' | 'explorer' | 'voyager' | 'pioneer';
+      avatar?: Record<string, unknown> | null;
+      backgroundImg?: Record<string, unknown> | null;
     }
   ): Promise<User> {
     return prisma.user.update({
@@ -118,6 +121,12 @@ export const authRepository = {
         ...(data.profileVisibility && { profileVisibility: data.profileVisibility }),
         ...(data.profileRating && { profileRating: data.profileRating }),
         ...(data.subscriptionPlan && { subscriptionPlan: data.subscriptionPlan }),
+        ...(data.avatar !== undefined && {
+          avatar: data.avatar ? (data.avatar as Prisma.InputJsonValue) : Prisma.JsonNull,
+        }),
+        ...(data.backgroundImg !== undefined && {
+          backgroundImg: data.backgroundImg ? (data.backgroundImg as Prisma.InputJsonValue) : Prisma.JsonNull,
+        }),
       },
     });
   },

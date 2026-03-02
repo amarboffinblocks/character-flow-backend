@@ -2,6 +2,11 @@ import { lorebookRepository } from './lorebook.repository.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { prisma } from '../../lib/prisma.js';
+import {
+  deleteFromS3IfExists,
+  transformEntityImageUrls,
+  transformEntitiesImageUrls,
+} from '../../lib/s3.service.js';
 import type {
   CreateLorebookInput,
   UpdateLorebookInput,
@@ -129,7 +134,7 @@ export const lorebookService = {
       throw createError.notFound('Lorebook not found after creation');
     }
 
-    return { lorebook: lorebookWithEntries };
+    return { lorebook: await transformEntityImageUrls(lorebookWithEntries) };
   },
 
   // ============================================
@@ -148,7 +153,7 @@ export const lorebookService = {
       throw createError.forbidden('Lorebook is private');
     }
 
-    return { lorebook };
+    return { lorebook: await transformEntityImageUrls(lorebook) };
   },
 
   // ============================================
@@ -167,7 +172,7 @@ export const lorebookService = {
       throw createError.forbidden('Lorebook is private');
     }
 
-    return { lorebook };
+    return { lorebook: await transformEntityImageUrls(lorebook) };
   },
 
   // ============================================
@@ -182,7 +187,7 @@ export const lorebookService = {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      lorebooks,
+      lorebooks: await transformEntitiesImageUrls(lorebooks),
       pagination: {
         page,
         limit,
@@ -204,7 +209,7 @@ export const lorebookService = {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      lorebooks,
+      lorebooks: await transformEntitiesImageUrls(lorebooks),
       pagination: {
         page,
         limit,
@@ -248,6 +253,20 @@ export const lorebookService = {
           throw createError.internal('Failed to generate unique slug');
         }
         slug = generateSlug(input.name);
+      }
+    }
+
+    // Delete old S3 avatar when replacing
+    if (input.avatar !== undefined) {
+      const oldAvatar = existingLorebook.avatar as { url?: string } | null;
+      if (oldAvatar?.url) {
+        await deleteFromS3IfExists(oldAvatar.url);
+      }
+    }
+    if (input.avatar === null) {
+      const oldAvatar = existingLorebook.avatar as { url?: string } | null;
+      if (oldAvatar?.url) {
+        await deleteFromS3IfExists(oldAvatar.url);
       }
     }
 
@@ -370,7 +389,7 @@ export const lorebookService = {
       throw createError.notFound('Lorebook not found after update');
     }
 
-    return { lorebook: lorebookWithEntries };
+    return { lorebook: await transformEntityImageUrls(lorebookWithEntries) };
   },
 
   // ============================================
@@ -388,6 +407,10 @@ export const lorebookService = {
     if (lorebook.userId !== userId) {
       throw createError.forbidden('You do not have permission to delete this lorebook');
     }
+
+    // Delete avatar from S3
+    const avatar = lorebook.avatar as { url?: string } | null;
+    if (avatar?.url) await deleteFromS3IfExists(avatar.url);
 
     await lorebookRepository.deleteLorebook(id);
 
@@ -489,7 +512,7 @@ export const lorebookService = {
       isFavourite: !lorebook.isFavourite,
     });
 
-    return { lorebook: updatedLorebook };
+    return { lorebook: await transformEntityImageUrls(updatedLorebook) };
   },
 
   // ============================================
@@ -511,7 +534,7 @@ export const lorebookService = {
       isSaved: !lorebook.isSaved,
     });
 
-    return { lorebook: updatedLorebook };
+    return { lorebook: await transformEntityImageUrls(updatedLorebook) };
   },
 
   // ============================================
