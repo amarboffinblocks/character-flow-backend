@@ -7,11 +7,11 @@ import { Prisma } from '@prisma/client';
 
 export interface CreateRealmInput {
     name: string;
-    description?: string;
+    description?: string | null;
     tags?: string[];
     rating?: Rating;
     visibility?: Visibility;
-    avatar?: Record<string, unknown>;
+    avatar?: Record<string, unknown> | null;
     characterIds?: string[];
 }
 
