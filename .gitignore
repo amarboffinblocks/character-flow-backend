@@ -71,6 +71,7 @@ desktop.ini
 
 # Docker
 docker-compose.override.yml
+docker-compose.yml
 .dockerignore
 
 # Testing

@@ -32,7 +32,7 @@ export const createApp = async (): Promise<express.Application> => {
     contentSecurityPolicy: config.app.isProd,
   }));
 
-  // CORS configuration - supports ngrok and multiple origins
+  // CORS configuration - supports ngrok, multiple origins, and allow-all
   app.use(cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, Postman, etc.)
@@ -42,9 +42,10 @@ export const createApp = async (): Promise<express.Application> => {
 
       const allowedOrigin = config.cors.origin;
 
-      // Allow wildcard in development
-      if (allowedOrigin === '*' && config.app.isDev) {
-        return callback(null, true);
+      // Allow all origins when CORS_ORIGIN is *
+      if (allowedOrigin === '*') {
+        // Reflect request origin (required when credentials: true)
+        return callback(null, origin);
       }
 
       // Support comma-separated origins
