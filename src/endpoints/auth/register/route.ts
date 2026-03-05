@@ -12,7 +12,6 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
 
   // Register user
   const result = await authService.register(validatedData);
-  
 
   sendCreated(res, result, result.message);
 };
