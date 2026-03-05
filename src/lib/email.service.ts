@@ -132,7 +132,7 @@ export const emailService = {
    * Send email verification link
    */
   async sendVerificationEmail(email: string, token: string): Promise<boolean> {
-    const verificationUrl = `${config.app.isDev ? 'http://localhost:3000' : 'https://youruniverse.ai'}/verify/email/${token}`;
+    const verificationUrl = `${config.app.isDev ? 'http://localhost:3000' : 'https://your-universe-ai-frontend-d9gl.vercel.app'}/verify/email/${token}`;
 
     return this.sendEmail({
       to: email,
@@ -171,7 +171,7 @@ export const emailService = {
    * Send password reset email
    */
   async sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
-    const resetUrl = `${config.app.isDev ? 'http://localhost:3000' : 'https://youruniverse.ai'}/reset-password?token=${token}`;
+    const resetUrl = `${config.app.isDev ? 'http://localhost:3000' : 'https://your-universe-ai-frontend-d9gl.vercel.app/'}/reset-password?token=${token}`;
 
     return this.sendEmail({
       to: email,

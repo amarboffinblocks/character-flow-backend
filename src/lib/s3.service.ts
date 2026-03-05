@@ -14,7 +14,7 @@ let s3Client: S3Client | null = null;
  */
 export const getS3Client = (): S3Client | null => {
   if (!config.aws.accessKeyId || !config.aws.secretAccessKey || !config.aws.s3.bucket) {
-    logger.warn('AWS S3 credentials not configured. File uploads will use local storage.');
+    logger.warn('AWS S3 credentials not configured. Image uploads require S3 (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET).');
     return null;
   }
 

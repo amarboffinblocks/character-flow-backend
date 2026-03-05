@@ -1,8 +1,5 @@
 import sharp from 'sharp';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import { nanoid } from 'nanoid';
-import { config } from '../config/index.js';
 import { UPLOAD_CONSTANTS } from '../core/constants/index.js';
 import { createError } from './errors.js';
 import { uploadToS3, getS3Client } from '../lib/s3.service.js';
@@ -42,7 +39,7 @@ export const validateImageFile = (file: Express.Multer.File | undefined): void =
 
 /**
  * Processes uploaded image and returns metadata
- * Uploads to S3 if configured, otherwise saves to local disk
+ * Uploads to AWS S3 only - local storage fallback is disabled
  */
 export const processImageUpload = async (
   file: Express.Multer.File | undefined,
@@ -54,6 +51,13 @@ export const processImageUpload = async (
 
   validateImageFile(file);
 
+  const s3Client = getS3Client();
+  if (!s3Client) {
+    throw createError.unavailable(
+      'Image upload is not available. AWS S3 must be configured (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET).'
+    );
+  }
+
   // Generate unique filename
   const originalName = file.originalname || 'image';
   const fileExtension = originalName.split('.').pop() || 'jpg';
@@ -64,34 +68,14 @@ export const processImageUpload = async (
   const image = sharp(file.buffer || file.path);
   const metadata = await image.metadata();
 
-  // Check if S3 is configured
-  const s3Client = getS3Client();
-  
-  if (s3Client) {
-    // Upload to S3
-    const optimizedBuffer = await image.toBuffer();
-    const url = await uploadToS3(optimizedBuffer, s3Key, file.mimetype || 'image/jpeg');
-    
-    return {
-      url,
-      width: metadata.width || 0,
-      height: metadata.height || 0,
-    };
-  } else {
-    // Fallback to local storage
-    const uploadDir = join(config.upload.dir, folder);
-    await fs.mkdir(uploadDir, { recursive: true });
-    const filepath = join(uploadDir, filename);
-    await image.toFile(filepath);
-    
-    const url = `/uploads/${folder}/${filename}`;
-    
-    return {
-      url,
-      width: metadata.width || 0,
-      height: metadata.height || 0,
-    };
-  }
+  const optimizedBuffer = await image.toBuffer();
+  const url = await uploadToS3(optimizedBuffer, s3Key, file.mimetype || 'image/jpeg');
+
+  return {
+    url,
+    width: metadata.width || 0,
+    height: metadata.height || 0,
+  };
 };
 
 /**
