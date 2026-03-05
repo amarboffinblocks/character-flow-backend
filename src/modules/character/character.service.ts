@@ -1,6 +1,7 @@
 import { characterRepository } from './character.repository.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
+import { normalizeCharacterData } from '../../utils/character-card.parser.js';
 import { prisma } from '../../lib/prisma.js';
 import {
   deleteFromS3IfExists,
@@ -708,7 +709,21 @@ export const characterService = {
       authorName = userActualName;
     }
 
-    // Map imported data to CreateCharacterData
+    // Normalize avatar/backgroundImg: accept string URL or { url } object (V1/V2/PNG formats)
+    const avatarObj =
+      characterData.avatar && typeof characterData.avatar === 'object' && 'url' in characterData.avatar
+        ? (characterData.avatar as { url: string })
+        : typeof characterData.avatar === 'string' && characterData.avatar.trim()
+          ? { url: characterData.avatar }
+          : null;
+    const backgroundObj =
+      characterData.backgroundImg && typeof characterData.backgroundImg === 'object' && 'url' in characterData.backgroundImg
+        ? (characterData.backgroundImg as { url: string })
+        : typeof characterData.backgroundImg === 'string' && characterData.backgroundImg.trim()
+          ? { url: characterData.backgroundImg }
+          : null;
+
+    // Map imported data to CreateCharacterData (supports V1, V2 JSON and PNG metadata)
     const createData: CreateCharacterData = {
       userId,
       name: characterData.name,
@@ -718,8 +733,8 @@ export const characterService = {
       summary: characterData.summary ?? null,
       rating: characterData.rating ?? 'SFW',
       visibility,
-      avatar: characterData.avatar ? { url: characterData.avatar } : null,
-      backgroundImg: characterData.backgroundImg ? { url: characterData.backgroundImg } : null,
+      avatar: avatarObj,
+      backgroundImg: backgroundObj,
       tags: Array.isArray(characterData.tags) ? characterData.tags : [],
       firstMessage: characterData.firstMessage ?? null,
       alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],
@@ -761,14 +776,17 @@ export const characterService = {
 
     const userActualName = user?.name ?? null;
 
-    // Process each character
-    for (const characterData of charactersData) {
+    // Process each character (normalize V1/V2 format first)
+    for (const rawData of charactersData) {
       try {
+        // Normalize V1/V2 character card format to our schema
+        const characterData = normalizeCharacterData(rawData);
+
         // Validate required fields
         if (!characterData.name || typeof characterData.name !== 'string') {
           results.failed++;
           results.errors.push({
-            name: characterData.name || 'Unknown',
+            name: (rawData as { name?: string })?.name || 'Unknown',
             error: 'Character name is required',
           });
           continue;
@@ -801,6 +819,20 @@ export const characterService = {
           authorName = userActualName;
         }
 
+        // Normalize avatar/backgroundImg (string URL or { url } object)
+        const avatarObj =
+          characterData.avatar && typeof characterData.avatar === 'object' && 'url' in characterData.avatar
+            ? (characterData.avatar as { url: string })
+            : typeof characterData.avatar === 'string' && characterData.avatar.trim()
+              ? { url: characterData.avatar }
+              : null;
+        const backgroundObj =
+          characterData.backgroundImg && typeof characterData.backgroundImg === 'object' && 'url' in characterData.backgroundImg
+            ? (characterData.backgroundImg as { url: string })
+            : typeof characterData.backgroundImg === 'string' && characterData.backgroundImg.trim()
+              ? { url: characterData.backgroundImg }
+              : null;
+
         // Map imported data to CreateCharacterData
         const createData: CreateCharacterData = {
           userId,
@@ -811,8 +843,8 @@ export const characterService = {
           summary: characterData.summary ?? null,
           rating: characterData.rating ?? 'SFW',
           visibility,
-          avatar: characterData.avatar ? { url: characterData.avatar } : null,
-          backgroundImg: characterData.backgroundImg ? { url: characterData.backgroundImg } : null,
+          avatar: avatarObj,
+          backgroundImg: backgroundObj,
           tags: Array.isArray(characterData.tags) ? characterData.tags : [],
           firstMessage: characterData.firstMessage ?? null,
           alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],
@@ -830,8 +862,16 @@ export const characterService = {
         results.characters.push(character);
       } catch (error: any) {
         results.failed++;
+        const errName =
+          (typeof rawData === 'object' && rawData !== null && 'name' in rawData
+            ? (rawData as { name?: string }).name
+            : null) ||
+          (typeof rawData === 'object' && rawData !== null && 'data' in rawData
+            ? (rawData as { data?: { name?: string } }).data?.name
+            : null) ||
+          'Unknown';
         results.errors.push({
-          name: characterData.name || 'Unknown',
+          name: String(errName),
           error: error.message || 'Unknown error occurred',
         });
       }
