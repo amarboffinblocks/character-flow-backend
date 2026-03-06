@@ -138,6 +138,35 @@ export const lorebookService = {
   },
 
   // ============================================
+  // Import Lorebook from JSON
+  // ============================================
+
+  async importLorebook(userId: string, lorebookData: any): Promise<LorebookResponse> {
+    if (!lorebookData.name || typeof lorebookData.name !== 'string') {
+      throw createError.badRequest('Lorebook name is required');
+    }
+
+    const input: CreateLorebookInput = {
+      name: lorebookData.name,
+      description: lorebookData.description ?? undefined,
+      rating: (lorebookData.rating === 'NSFW' || lorebookData.rating === 'SFW') ? lorebookData.rating : 'SFW',
+      visibility: (lorebookData.visibility === 'public' || lorebookData.visibility === 'private') ? lorebookData.visibility : 'private',
+      tags: Array.isArray(lorebookData.tags) ? lorebookData.tags : [],
+      avatar: lorebookData.avatar && typeof lorebookData.avatar === 'object' ? lorebookData.avatar : undefined,
+      entries: Array.isArray(lorebookData.entries)
+        ? lorebookData.entries.map((e: any) => ({
+            keywords: Array.isArray(e.keywords) ? e.keywords : (e.keywords ? [String(e.keywords)] : []),
+            context: typeof e.context === 'string' ? e.context : '',
+            isEnabled: e.isEnabled ?? true,
+            priority: typeof e.priority === 'number' ? e.priority : 0,
+          }))
+        : undefined,
+    };
+
+    return this.createLorebook(userId, input);
+  },
+
+  // ============================================
   // Get Lorebook By ID
   // ============================================
 
