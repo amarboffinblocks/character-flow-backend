@@ -23,6 +23,7 @@ export interface UpdateRealmInput {
     visibility?: Visibility;
     avatar?: Record<string, unknown> | null;
     isFavourite?: boolean;
+    characterIds?: string[];
 }
 
 export interface RealmQueryParams {
@@ -86,4 +87,5 @@ export interface UpdateRealmData {
     visibility?: Visibility;
     avatar?: Record<string, unknown> | null;
     isFavourite?: boolean;
+    characterIds?: string[];
 }

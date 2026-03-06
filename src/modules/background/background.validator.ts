@@ -51,6 +51,9 @@ export const updateBackgroundSchema = z.object({
   description: descriptionSchema,
   tags: tagsSchema.optional(),
   rating: ratingSchema.optional(),
+  characterId: uuidSchema.optional().nullable(),
+  personaId: uuidSchema.optional().nullable(),
+  realmId: uuidSchema.optional().nullable(),
 });
 
 export const backgroundQuerySchema = z.object({
@@ -75,6 +78,17 @@ export const backgroundQuerySchema = z.object({
     .transform((val) => (val ? val.split(',').map((tag) => tag.trim()).filter(Boolean) : undefined)),
   rating: ratingSchema.optional(),
   linkedTo: z.enum(['character', 'persona', 'realm']).optional(),
+  characterId: uuidSchema.optional(),
+  personaId: uuidSchema.optional(),
+  realmId: uuidSchema.optional(),
+  isGlobalDefault: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (val === 'true') return true;
+      if (val === 'false') return false;
+      return undefined;
+    }),
   sort: z.enum(['date', 'name']).optional().default('date'),
   order: z.enum(['asc', 'desc']).optional().default('desc'),
 });

@@ -1,4 +1,5 @@
 import { backgroundRepository } from './background.repository.js';
+import { transformEntitiesImageUrls, transformEntityImageUrls } from '../../lib/s3.service.js';
 import { createError } from '../../utils/index.js';
 import type {
   CreateBackgroundInput,
@@ -21,7 +22,7 @@ export const backgroundService = {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      backgrounds,
+      backgrounds: await transformEntitiesImageUrls(backgrounds),
       pagination: {
         page,
         limit,
@@ -42,7 +43,7 @@ export const backgroundService = {
       throw createError.forbidden('Access denied');
     }
 
-    return { background };
+    return { background: await transformEntityImageUrls(background) };
   },
 
   async createBackground(userId: string, input: CreateBackgroundInput): Promise<BackgroundResponse> {
@@ -55,7 +56,7 @@ export const backgroundService = {
       rating: input.rating ?? 'SFW',
     });
 
-    return { background };
+    return { background: await transformEntityImageUrls(background) };
   },
 
   async updateBackground(
@@ -80,7 +81,7 @@ export const backgroundService = {
       rating: input.rating,
     });
 
-    return { background };
+    return { background: await transformEntityImageUrls(background) };
   },
 
   async deleteBackground(id: string, userId: string): Promise<void> {
@@ -110,7 +111,7 @@ export const backgroundService = {
 
     const background = await backgroundRepository.setGlobalDefault(userId, id);
 
-    return { background };
+    return { background: await transformEntityImageUrls(background) };
   },
 
   async importBackground(
@@ -125,7 +126,7 @@ export const backgroundService = {
       tags: [],
       rating: 'SFW',
     });
-    return { background };
+    return { background: await transformEntityImageUrls(background) };
   },
 
   async bulkImportBackgrounds(
@@ -158,7 +159,7 @@ export const backgroundService = {
     return {
       imported: backgrounds.length,
       failed,
-      backgrounds,
+      backgrounds: await transformEntitiesImageUrls(backgrounds),
       errors,
     };
   },

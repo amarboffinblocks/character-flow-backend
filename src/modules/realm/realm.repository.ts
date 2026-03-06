@@ -117,6 +117,11 @@ export const realmRepository = {
             updateData.avatar = data.avatar ? (data.avatar as Prisma.InputJsonValue) : Prisma.JsonNull;
         }
         if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
+        if (data.characterIds !== undefined) {
+            updateData.characters = {
+                set: data.characterIds.map(id => ({ id }))
+            };
+        }
 
         return prisma.realm.update({
             where: { id },

@@ -1,6 +1,10 @@
 import { realmRepository } from './realm.repository.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
+import {
+    transformEntityImageUrls,
+    transformEntitiesImageUrls,
+} from '../../lib/s3.service.js';
 import type {
     CreateRealmInput,
     UpdateRealmInput,
@@ -39,7 +43,11 @@ export const realmService = {
         };
 
         const realm = await realmRepository.createRealm(realmData);
-        return { realm };
+        const transformedRealm = await transformEntityImageUrls(realm) as any;
+        if (transformedRealm.characters) {
+            transformedRealm.characters = await transformEntitiesImageUrls(transformedRealm.characters);
+        }
+        return { realm: transformedRealm };
     },
 
     async getRealmById(id: string, userId: string): Promise<RealmResponse> {
@@ -57,8 +65,16 @@ export const realmService = {
         const limit = params.limit ?? 20;
         const totalPages = Math.ceil(total / limit);
 
+        const transformedRealms = await Promise.all(realms.map(async (realm: any) => {
+            const transformed = await transformEntityImageUrls(realm) as any;
+            if (transformed.characters) {
+                transformed.characters = await transformEntitiesImageUrls(transformed.characters);
+            }
+            return transformed;
+        }));
+
         return {
-            realms,
+            realms: transformedRealms,
             pagination: {
                 page,
                 limit,
@@ -92,10 +108,15 @@ export const realmService = {
             ...(input.visibility && { visibility: input.visibility }),
             ...(input.avatar !== undefined && { avatar: input.avatar }),
             ...(input.isFavourite !== undefined && { isFavourite: input.isFavourite }),
+            ...(input.characterIds !== undefined && { characterIds: input.characterIds }),
         };
 
         const realm = await realmRepository.updateRealm(id, updateData);
-        return { realm };
+        const transformedRealm = await transformEntityImageUrls(realm) as any;
+        if (transformedRealm.characters) {
+            transformedRealm.characters = await transformEntitiesImageUrls(transformedRealm.characters);
+        }
+        return { realm: transformedRealm };
     },
 
     async deleteRealm(id: string, userId: string): Promise<MessageResponse> {

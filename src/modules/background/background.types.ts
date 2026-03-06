@@ -23,6 +23,9 @@ export interface UpdateBackgroundInput {
   description?: string | null;
   tags?: string[];
   rating?: Rating;
+  characterId?: string | null;
+  personaId?: string | null;
+  realmId?: string | null;
 }
 
 export interface BackgroundQueryParams {
@@ -33,6 +36,10 @@ export interface BackgroundQueryParams {
   excludeTags?: string[];
   rating?: Rating;
   linkedTo?: 'character' | 'persona' | 'realm';
+  isGlobalDefault?: boolean;
+  characterId?: string;
+  personaId?: string;
+  realmId?: string;
   sort?: 'date' | 'name';
   order?: 'asc' | 'desc';
 }
@@ -73,4 +80,7 @@ export interface UpdateBackgroundData {
   description?: string | null;
   tags?: string[];
   rating?: Rating;
+  characterId?: string | null;
+  personaId?: string | null;
+  realmId?: string | null;
 }

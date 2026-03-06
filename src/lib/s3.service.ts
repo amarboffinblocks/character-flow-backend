@@ -218,6 +218,7 @@ export const transformEntityImageUrls = async <T>(entity: T): Promise<T> => {
   const result = { ...entity } as Record<string, unknown>;
   const avatar = result.avatar;
   const backgroundImg = result.backgroundImg;
+  const image = result.image;
 
   if (avatar && typeof avatar === 'object' && avatar !== null && 'url' in avatar && typeof avatar.url === 'string') {
     result.avatar = {
@@ -235,6 +236,12 @@ export const transformEntityImageUrls = async <T>(entity: T): Promise<T> => {
     result.backgroundImg = {
       ...backgroundImg,
       url: await getPresignedViewUrl(backgroundImg.url),
+    };
+  }
+  if (image && typeof image === 'object' && image !== null && 'url' in image && typeof image.url === 'string') {
+    result.image = {
+      ...image,
+      url: await getPresignedViewUrl(image.url),
     };
   }
 

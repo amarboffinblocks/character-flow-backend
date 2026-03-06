@@ -26,6 +26,10 @@ export const backgroundRepository = {
       tags,
       excludeTags,
       linkedTo,
+      isGlobalDefault,
+      characterId,
+      personaId,
+      realmId,
       sort = 'date',
       order = 'desc',
     } = params;
@@ -41,6 +45,10 @@ export const backgroundRepository = {
       where.rating = rating as Rating;
     }
 
+    if (isGlobalDefault !== undefined) {
+      where.isGlobalDefault = isGlobalDefault;
+    }
+
     if (tags && tags.length > 0) {
       where.tags = { hasEvery: tags };
     }
@@ -54,6 +62,10 @@ export const backgroundRepository = {
       if (linkedTo === 'persona') where.personaId = { not: null };
       if (linkedTo === 'realm') where.realmId = { not: null };
     }
+
+    if (characterId) where.characterId = characterId;
+    if (personaId) where.personaId = personaId;
+    if (realmId) where.realmId = realmId;
 
     if (search) {
       where.OR = [
@@ -99,6 +111,16 @@ export const backgroundRepository = {
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.rating !== undefined) updateData.rating = data.rating;
 
+    if (data.characterId !== undefined) {
+      updateData.character = data.characterId ? { connect: { id: data.characterId } } : { disconnect: true };
+    }
+    if (data.personaId !== undefined) {
+      updateData.persona = data.personaId ? { connect: { id: data.personaId } } : { disconnect: true };
+    }
+    if (data.realmId !== undefined) {
+      updateData.realm = data.realmId ? { connect: { id: data.realmId } } : { disconnect: true };
+    }
+
     return prisma.background.update({
       where: { id },
       data: updateData,
@@ -106,20 +128,35 @@ export const backgroundRepository = {
   },
 
   async delete(id: string): Promise<void> {
+    const background = await prisma.background.findUnique({
+      where: { id },
+      select: { image: true },
+    });
+
+    if (background && background.image) {
+      const imageMetadata = background.image as any;
+      if (imageMetadata.url) {
+        const { deleteFromS3IfExists } = await import('../../lib/s3.service.js');
+        await deleteFromS3IfExists(imageMetadata.url);
+      }
+    }
+
     await prisma.background.delete({
       where: { id },
     });
   },
 
   async setGlobalDefault(userId: string, id: string): Promise<Background> {
-    await prisma.background.updateMany({
-      where: { userId },
-      data: { isGlobalDefault: false },
-    });
+    return prisma.$transaction(async (tx) => {
+      await tx.background.updateMany({
+        where: { userId },
+        data: { isGlobalDefault: false },
+      });
 
-    return prisma.background.update({
-      where: { id },
-      data: { isGlobalDefault: true },
+      return tx.background.update({
+        where: { id },
+        data: { isGlobalDefault: true },
+      });
     });
   },
 };
