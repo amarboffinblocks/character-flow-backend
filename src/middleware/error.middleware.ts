@@ -59,9 +59,11 @@ export const errorHandler = (
     timestamp: new Date().toISOString(),
   };
 
-  // Handle Zod validation errors
-  if (error instanceof ZodError) {
-    const details = (error.issues || []).map((err) => ({
+  // Handle Zod validation errors (by instance or by shape - production bundles can break instanceof)
+  const zodIssues = (error as { issues?: Array<{ path?: unknown[]; message?: string; code?: string }> }).issues;
+  if (error instanceof ZodError || (Array.isArray(zodIssues) && zodIssues.length > 0)) {
+    const issues = error instanceof ZodError ? (error as ZodError).issues : zodIssues;
+    const details = (issues || []).map((err: { path?: unknown[]; message?: string; code?: string }) => ({
       field: (err.path || []).join('.'),
       message: err.message || 'Validation error',
       code: err.code || 'invalid_type',

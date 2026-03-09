@@ -7,19 +7,23 @@ import { logger } from '../../lib/logger.js';
 import type { Model } from '../../modules/model/model.types.js';
 
 // Serialize model for JSON response (avoids BigInt/custom types from DB breaking res.json())
-function serializeModel(m: Model) {
+// Defensive for production: Prisma may return Date or ISO string depending on driver/config
+function serializeModel(m: Model | Record<string, unknown>) {
+  const raw = m as Record<string, unknown>;
+  const toDate = (v: unknown): string =>
+    v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : String(v ?? '');
   return {
-    id: m.id,
-    name: m.name,
-    slug: m.slug,
-    description: m.description,
-    provider: m.provider,
-    modelName: m.modelName,
-    isActive: m.isActive,
-    isDefault: m.isDefault,
-    metadata: m.metadata,
-    createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
-    updatedAt: m.updatedAt instanceof Date ? m.updatedAt.toISOString() : m.updatedAt,
+    id: raw.id ?? '',
+    name: raw.name ?? '',
+    slug: raw.slug ?? '',
+    description: raw.description ?? null,
+    provider: raw.provider ?? 'aws',
+    modelName: raw.modelName ?? null,
+    isActive: Boolean(raw.isActive),
+    isDefault: Boolean(raw.isDefault),
+    metadata: raw.metadata ?? null,
+    createdAt: toDate(raw.createdAt),
+    updatedAt: toDate(raw.updatedAt),
   };
 }
 
@@ -59,14 +63,17 @@ export const GET = async (req: Request, res: Response): Promise<void> => {
 
 export const POST = async (req: Request, res: Response): Promise<void> => {
   try {
-    const validated = createModelSchema.parse(req.body);
+    const body = req.body ?? {};
+    const validated = createModelSchema.parse(body);
     const result = await modelService.createModel(validated);
-    const data = { model: serializeModel(result.model) };
+    const data = { model: serializeModel(result.model as Model | Record<string, unknown>) };
     sendSuccess(res, data, 'Model created successfully', 201);
   } catch (error) {
-    if (error instanceof ZodError) {
+    // Catch ZodError by instance or by shape (production bundles can break instanceof)
+    const issues = (error as { issues?: Array<{ path?: unknown[]; message?: string; code?: string }> }).issues;
+    if (error instanceof ZodError || (Array.isArray(issues) && issues.length > 0)) {
       const zodError = error as ZodError;
-      const details = (zodError.issues || []).map((err) => ({
+      const details = (zodError.issues || issues || []).map((err: { path?: unknown[]; message?: string; code?: string }) => ({
         field: (err.path || []).join('.'),
         message: err.message || 'Validation error',
         code: err.code || 'invalid_type',
