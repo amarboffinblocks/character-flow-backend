@@ -192,7 +192,10 @@ export const errorHandler = (
 
   // Known deployment/setup errors: return clear message so production can be fixed
   const msg = errorObj.message || '';
-  if (msg.includes('Prisma client missing') && msg.includes('model')) {
+  const isModelDelegateError =
+    (msg.includes('Prisma client missing') && msg.includes('model')) ||
+    (errorObj.name === 'TypeError' && (msg.includes("findMany") || msg.includes("findUnique") || msg.includes("findFirst") || msg.includes("create") || msg.includes("'model'")));
+  if (isModelDelegateError) {
     logger.error({ ...errorContext }, 'Prisma model delegate missing (run prisma generate)');
     sendError(
       res,

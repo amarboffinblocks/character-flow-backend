@@ -139,6 +139,24 @@ Railway automatically provides a domain. You can:
 1. Go to Settings → Networking
 2. Generate a domain or use a custom domain
 
+## Models API (GET/POST /api/v1/models) and Swagger
+
+To **create models via Swagger** on production:
+
+1. **Build must include Prisma client generation**  
+   The repo’s `npm run build` runs `prisma generate && tsc`. The Dockerfile also runs `npx prisma generate` in the builder stage. Do not remove these steps.
+
+2. **Database must have the `models` table**  
+   Migrations must be applied in production. The Dockerfile runs `npx prisma migrate deploy` before starting the app. If you deploy without Docker, run once on the production DB:
+   ```bash
+   npx prisma migrate deploy
+   ```
+
+3. **If you see 500 or 503**  
+   - **503 + "Models API is not configured"** → Run `npx prisma generate` during build and ensure migrations have been run.
+   - **503 + "Database schema is out of date"** → Run `npx prisma migrate deploy` on the production database.
+   - After fixing, redeploy and try **POST /api/v1/models** again from Swagger (or **GET /api/v1/models** to list).
+
 ## Troubleshooting
 
 ### Build Fails: "npm ci requires package-lock.json"
