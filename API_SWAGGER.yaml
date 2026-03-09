@@ -1152,6 +1152,40 @@ paths:
                           createdAt: "2024-01-15T10:00:00Z"
                           updatedAt: "2024-01-15T10:00:00Z"
                     message: "Models retrieved successfully"
+        '422':
+          description: Validation failed (e.g., invalid query parameters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "Validation failed. Please check your input."
+                  details: []
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INTERNAL_SERVER_ERROR"
+                  message: "An unexpected error occurred. Please try again later."
+        '503':
+          description: Models API not configured (run `npx prisma generate` and ensure DB has models table / migrations)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "DATABASE_ERROR"
+                  message: "Models API is not configured. Run \"npx prisma generate\" during build and ensure the database has the models table (run migrations)."
     post:
       tags:
         - Models
@@ -1246,6 +1280,40 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          description: Validation failed (e.g., invalid body - slug format, required fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "Validation failed. Please check your input."
+                  details: []
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INTERNAL_SERVER_ERROR"
+                  message: "An unexpected error occurred. Please try again later."
+        '503':
+          description: Models API not configured or database schema out of date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "DATABASE_ERROR"
+                  message: "Models API is not configured. Run \"npx prisma generate\" during build and ensure the database has the models table (run migrations)."
 
   /models/{id}:
     get:
