@@ -159,4 +159,11 @@ export const backgroundRepository = {
       });
     });
   },
+
+  async clearGlobalDefault(userId: string): Promise<void> {
+    await prisma.background.updateMany({
+      where: { userId },
+      data: { isGlobalDefault: false },
+    });
+  },
 };

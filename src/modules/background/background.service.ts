@@ -114,6 +114,10 @@ export const backgroundService = {
     return { background: await transformEntityImageUrls(background) };
   },
 
+  async clearGlobalDefault(userId: string): Promise<void> {
+    await backgroundRepository.clearGlobalDefault(userId);
+  },
+
   async importBackground(
     userId: string,
     imageMetadata: { url: string; width?: number; height?: number }

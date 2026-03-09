@@ -17,3 +17,14 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
   await backgroundService.setGlobalDefault(id, user.id);
   sendSuccess(res, { message: 'Background set as global default' }, 'Background set as global default');
 };
+
+// ============================================
+// DELETE /api/v1/backgrounds/:id/default - Clear Global Default
+// ============================================
+
+export const DELETE = async (req: Request, res: Response): Promise<void> => {
+  const user = requireCurrentUser(req);
+
+  await backgroundService.clearGlobalDefault(user.id);
+  sendSuccess(res, { message: 'Global default background cleared' }, 'Global default background cleared');
+};
