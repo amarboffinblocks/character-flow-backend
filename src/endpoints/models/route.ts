@@ -61,7 +61,8 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
   try {
     const validated = createModelSchema.parse(req.body);
     const result = await modelService.createModel(validated);
-    sendSuccess(res, result, 'Model created successfully', 201);
+    const data = { model: serializeModel(result.model) };
+    sendSuccess(res, data, 'Model created successfully', 201);
   } catch (error) {
     if (error instanceof ZodError) {
       const zodError = error as ZodError;
@@ -73,6 +74,11 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
       sendError(res, 'Validation failed. Please check your input.', 'VALIDATION_ERROR', 422, details);
       return;
     }
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error(
+      { err: error, path: req.path, method: req.method, message: err.message, body: req.body },
+      'POST /api/v1/models failed'
+    );
     throw error;
   }
 };
