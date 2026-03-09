@@ -1,19 +1,30 @@
 import { prisma } from '../../lib/prisma.js';
 import type { Model, ModelQueryParams } from './model.types.js';
 
+// Prisma client delegate for Model (table "models"). Use getModelDelegate() so we fail fast if schema wasn't generated.
+const getModelDelegate = () => {
+  const delegate = (prisma as any).model;
+  if (!delegate || typeof delegate.findMany !== 'function') {
+    throw new Error(
+      'Prisma client missing "model" delegate. Run "npx prisma generate" and ensure schema includes the Model model (table "models").'
+    );
+  }
+  return delegate;
+};
+
 // ============================================
 // Model Repository
 // ============================================
 
 export const modelRepository = {
   async findModelById(id: string): Promise<Model | null> {
-    return (prisma as any).model.findUnique({
+    return getModelDelegate().findUnique({
       where: { id },
     });
   },
 
   async findModelBySlug(slug: string): Promise<Model | null> {
-    return (prisma as any).model.findUnique({
+    return getModelDelegate().findUnique({
       where: { slug },
     });
   },
@@ -23,7 +34,7 @@ export const modelRepository = {
     if (params?.isActive !== undefined) {
       where.isActive = params.isActive;
     }
-    return (prisma as any).model.findMany({
+    return getModelDelegate().findMany({
       where,
       orderBy: [
         { isDefault: 'desc' },
@@ -33,7 +44,7 @@ export const modelRepository = {
   },
 
   async findDefaultModel(): Promise<Model | null> {
-    return (prisma as any).model.findFirst({
+    return getModelDelegate().findFirst({
       where: { isDefault: true, isActive: true },
     });
   },
@@ -48,7 +59,7 @@ export const modelRepository = {
     isDefault?: boolean;
     metadata?: unknown;
   }): Promise<Model> {
-    return (prisma as any).model.create({
+    return getModelDelegate().create({
       data: {
         name: data.name,
         slug: data.slug,
