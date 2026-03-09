@@ -190,6 +190,29 @@ export const errorHandler = (
     return;
   }
 
+  // Known deployment/setup errors: return clear message so production can be fixed
+  const msg = errorObj.message || '';
+  if (msg.includes('Prisma client missing') && msg.includes('model')) {
+    logger.error({ ...errorContext }, 'Prisma model delegate missing (run prisma generate)');
+    sendError(
+      res,
+      'Models API is not configured. Run "npx prisma generate" during build and ensure the database has the models table (run migrations).',
+      'DATABASE_ERROR',
+      503
+    );
+    return;
+  }
+  if (msg.includes("relation") && msg.includes("does not exist")) {
+    logger.error({ ...errorContext }, 'Database table missing (run migrations)');
+    sendError(
+      res,
+      'Database schema is out of date. Run "npx prisma migrate deploy" on the production database.',
+      'DATABASE_ERROR',
+      503
+    );
+    return;
+  }
+
   // Handle unknown errors
   logger.error({ ...errorContext, errorType: errorObj.constructor.name }, 'Unhandled error');
   

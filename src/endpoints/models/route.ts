@@ -44,8 +44,9 @@ export const GET = async (req: Request, res: Response): Promise<void> => {
       sendError(res, 'Validation failed. Please check your input.', 'VALIDATION_ERROR', 422, details);
       return;
     }
+    const err = error instanceof Error ? error : new Error(String(error));
     logger.error(
-      { err: error, path: req.path, method: req.method },
+      { err: error, path: req.path, method: req.method, message: err.message },
       'GET /api/v1/models failed'
     );
     throw error;
