@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import { lorebookService, lorebookQuerySchema, createLorebookSchema } from '../../modules/lorebook/index.js';
-import { sendSuccess } from '../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 import { requireCurrentUser } from '../../middleware/auth.middleware.js';
+import { formatZodErrorForResponse } from '../../utils/errors.js';
 import type { AuthenticatedRequest } from '../../types/index.js';
 import { lorebookImageUpload } from '../../middleware/upload.middleware.js';
 import { processImageUpload } from '../../utils/image.helper.js';
@@ -57,14 +58,14 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
           await processLorebookCreation(req, res, user.id);
           resolve();
         } catch (error) {
+          const issues = (error as { issues?: unknown[] }).issues;
+          if (Array.isArray(issues) && issues.length > 0) {
+            const { message, details } = formatZodErrorForResponse(error);
+            sendError(res, message, 'VALIDATION_ERROR', 422, details);
+            return resolve();
+          }
           if (error instanceof Error) {
-            res.status(400).json({
-              success: false,
-              error: {
-                code: 'VALIDATION_ERROR',
-                message: error.message,
-              },
-            });
+            sendError(res, error.message, 'VALIDATION_ERROR', 400);
             return resolve();
           }
           reject(error);
@@ -77,14 +78,14 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
   try {
     await processLorebookCreation(req, res, user.id);
   } catch (error) {
+    const issues = (error as { issues?: unknown[] }).issues;
+    if (Array.isArray(issues) && issues.length > 0) {
+      const { message, details } = formatZodErrorForResponse(error);
+      sendError(res, message, 'VALIDATION_ERROR', 422, details);
+      return;
+    }
     if (error instanceof Error) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: error.message,
-        },
-      });
+      sendError(res, error.message, 'VALIDATION_ERROR', 400);
       return;
     }
     throw error;

@@ -70,11 +70,13 @@ const contextSchema = z
   .max(10000, 'Context must be at most 10000 characters')
   .trim();
 
+const PRIORITY_MAX = 10000;
+
 const prioritySchema = z
   .number()
   .int()
   .min(0, 'Priority must be at least 0')
-  .max(100, 'Priority must be at most 100')
+  .max(PRIORITY_MAX, `Priority must be at most ${PRIORITY_MAX}`)
   .default(0);
 
 // ============================================
@@ -106,7 +108,7 @@ export const createLorebookSchema = z.object({
   visibility: visibilitySchema.optional().default('private'),
   avatar: avatarSchema,
   tags: tagsSchema,
-  entries: z.array(createLorebookEntrySchema).max(100, 'Maximum 100 entries allowed').optional().default([]),
+  entries: z.array(createLorebookEntrySchema).max(300, 'Maximum 300 entries allowed').optional().default([]),
   characterIds: uuidArraySchema,
   personaIds: uuidArraySchema,
 });
@@ -118,7 +120,7 @@ export const updateLorebookSchema = z.object({
   visibility: visibilitySchema.optional(),
   avatar: avatarSchema,
   tags: tagsSchema.optional(),
-  entries: z.array(createLorebookEntrySchema).max(100, 'Maximum 100 entries allowed').optional(),
+  entries: z.array(createLorebookEntrySchema).max(300, 'Maximum 300 entries allowed').optional(),
   characterIds: uuidArraySchema,
   personaIds: uuidArraySchema,
   isFavourite: z.boolean().optional(),

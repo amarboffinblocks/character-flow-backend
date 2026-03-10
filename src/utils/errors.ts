@@ -142,6 +142,34 @@ export class ExternalServiceError extends AppError {
 // Error Factory
 // ============================================
 
+// ============================================
+// Zod error formatter (for consistent API error responses)
+// ============================================
+
+const MAX_ZOD_DETAILS = 10;
+
+export function formatZodErrorForResponse(error: unknown): {
+  message: string;
+  details: Array<{ field: string; message: string; code: string }>;
+} {
+  const issues = (error as { issues?: Array<{ path?: unknown[]; message?: string; code?: string }> }).issues;
+  if (!Array.isArray(issues) || issues.length === 0) {
+    return { message: 'Validation failed. Please check your input.', details: [] };
+  }
+  const details = issues.slice(0, MAX_ZOD_DETAILS).map((err) => ({
+    field: (err.path || []).join('.'),
+    message: err.message || 'Validation error',
+    code: err.code || 'invalid_type',
+  }));
+  const first = issues[0];
+  const firstField = (first.path || []).join('.');
+  const message =
+    issues.length === 1
+      ? `Validation failed: ${firstField} ${first.message}`
+      : `Validation failed: ${issues.length} error(s). First: ${firstField} - ${first.message}`;
+  return { message, details };
+}
+
 export const createError = {
   badRequest: (message?: string, details?: unknown) => new BadRequestError(message, details),
   unauthorized: (message?: string) => new UnauthorizedError(message),

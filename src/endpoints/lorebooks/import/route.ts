@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
 import { lorebookService } from '../../../modules/lorebook/index.js';
-import { sendSuccess } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../../utils/response.js';
 import { requireCurrentUser } from '../../../middleware/auth.middleware.js';
 import multer from 'multer';
-import { createError } from '../../../utils/errors.js';
+import { createError, formatZodErrorForResponse } from '../../../utils/errors.js';
 
 // ============================================
 // Multer Configuration for Import
@@ -88,14 +88,14 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
         sendSuccess(res, result, 'Lorebook imported successfully', 201);
         resolve();
       } catch (error) {
+        const issues = (error as { issues?: unknown[] }).issues;
+        if (Array.isArray(issues) && issues.length > 0) {
+          const { message, details } = formatZodErrorForResponse(error);
+          sendError(res, message, 'VALIDATION_ERROR', 422, details);
+          return resolve();
+        }
         if (error instanceof Error) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: error.message,
-            },
-          });
+          sendError(res, error.message, 'VALIDATION_ERROR', 400);
           return resolve();
         }
         reject(error);

@@ -496,17 +496,23 @@ export const authService = {
     });
 
     // Send password reset email (with proper error handling)
+    logger.info({ to: user.email }, 'Sending password reset email');
     try {
       await emailService.sendPasswordResetEmail(user.email, resetToken);
     } catch (error) {
       // Log error but don't reveal if user exists (security best practice)
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const resetUrl = `${config.app.isDev ? 'http://localhost:3000' : 'https://your-universe-ai-frontend-d9gl.vercel.app'}/reset-password?token=${resetToken}`;
       logger.error({
         err: error,
         email: user.email,
-        errorMessage
+        errorMessage,
+        ...(config.app.isDev && { resetLink: resetUrl }),
       }, 'Failed to send password reset email');
 
+      if (config.app.isDev) {
+        logger.warn(`[DEV] Password reset email failed. Use this link to test: ${resetUrl}`);
+      }
       // Still return success message to user (don't reveal if email exists)
       // But log the error for admin/debugging
     }

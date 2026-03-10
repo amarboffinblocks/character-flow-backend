@@ -26,6 +26,93 @@ import type {
 import type { Lorebook, LorebookEntry } from '@prisma/client';
 
 // ============================================
+// Chub / external format: entries as object keyed by id
+// ============================================
+
+const PRIORITY_MAX = 100;
+
+function normalizeImportEntries(entries: unknown): CreateLorebookEntryInput[] {
+  let list: CreateLorebookEntryInput[] = [];
+
+  if (Array.isArray(entries)) {
+    list = entries
+      .map((e: any) => {
+        const keywords = Array.isArray(e.keywords)
+          ? e.keywords.map((k: any) => String(k).trim()).filter(Boolean)
+          : Array.isArray(e.keys)
+            ? e.keys.map((k: any) => String(k).trim()).filter(Boolean)
+            : e.key
+              ? (Array.isArray(e.key) ? e.key : [e.key]).map((k: any) => String(k).trim()).filter(Boolean)
+              : e.name
+                ? [String(e.name).trim()].filter(Boolean)
+                : [];
+        if (keywords.length === 0) return null;
+        const context =
+          typeof e.context === 'string'
+            ? e.context.trim()
+            : typeof e.content === 'string'
+              ? e.content.trim()
+              : '';
+        const rawPriority =
+          typeof e.priority === 'number'
+            ? e.priority
+            : typeof e.insertion_order === 'number'
+              ? e.insertion_order
+              : typeof e.order === 'number'
+                ? e.order
+                : 0;
+        return {
+          keywords,
+          context: context || '[No context]',
+          isEnabled: e.enabled !== undefined ? Boolean(e.enabled) : e.disable !== undefined ? !e.disable : true,
+          priority: Math.min(Math.max(0, Math.floor(Number(rawPriority))), PRIORITY_MAX),
+        } as CreateLorebookEntryInput;
+      })
+      .filter((e): e is CreateLorebookEntryInput => e != null);
+  } else if (entries && typeof entries === 'object' && !Array.isArray(entries)) {
+    list = (Object.values(entries) as any[])
+      .map((e, i) => {
+        const keywords = Array.isArray(e?.keys)
+          ? e.keys.map((k: any) => String(k).trim()).filter(Boolean)
+          : Array.isArray(e?.key)
+            ? e.key.map((k: any) => String(k).trim()).filter(Boolean)
+            : e?.name
+              ? [String(e.name).trim()].filter(Boolean)
+              : [];
+        if (keywords.length === 0) return null;
+        const context =
+          typeof e?.content === 'string'
+            ? e.content.trim()
+            : typeof e?.comment === 'string'
+              ? e.comment.trim()
+              : '';
+        const rawPriority =
+          typeof e?.priority === 'number'
+            ? e.priority
+            : typeof e?.insertion_order === 'number'
+              ? e.insertion_order
+              : typeof e?.order === 'number'
+                ? e.order
+                : i + 1;
+        return {
+          keywords,
+          context: context || '[No context]',
+          isEnabled: e?.enabled !== undefined ? Boolean(e.enabled) : e?.disable !== undefined ? !e.disable : true,
+          priority: Math.min(Math.max(0, Math.floor(Number(rawPriority))), PRIORITY_MAX),
+        } as CreateLorebookEntryInput;
+      })
+      .filter((e): e is CreateLorebookEntryInput => e != null);
+    list.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+  }
+
+  // Reassign priority to 1..100 so order is preserved and validator passes (max 100)
+  return list.map((e, i) => ({
+    ...e,
+    priority: Math.min(i + 1, PRIORITY_MAX),
+  }));
+}
+
+// ============================================
 // Lorebook Service
 // ============================================
 
@@ -138,7 +225,7 @@ export const lorebookService = {
   },
 
   // ============================================
-  // Import Lorebook from JSON
+  // Import Lorebook from JSON (supports our format and Chub format)
   // ============================================
 
   async importLorebook(userId: string, lorebookData: any): Promise<LorebookResponse> {
@@ -146,21 +233,16 @@ export const lorebookService = {
       throw createError.badRequest('Lorebook name is required');
     }
 
+    const entries = normalizeImportEntries(lorebookData.entries);
+
     const input: CreateLorebookInput = {
-      name: lorebookData.name,
-      description: lorebookData.description ?? undefined,
+      name: lorebookData.name.trim(),
+      description: lorebookData.description != null ? String(lorebookData.description).trim() : undefined,
       rating: (lorebookData.rating === 'NSFW' || lorebookData.rating === 'SFW') ? lorebookData.rating : 'SFW',
       visibility: (lorebookData.visibility === 'public' || lorebookData.visibility === 'private') ? lorebookData.visibility : 'private',
-      tags: Array.isArray(lorebookData.tags) ? lorebookData.tags : [],
+      tags: Array.isArray(lorebookData.tags) ? lorebookData.tags.map((t: any) => String(t).trim()).filter(Boolean) : [],
       avatar: lorebookData.avatar && typeof lorebookData.avatar === 'object' ? lorebookData.avatar : undefined,
-      entries: Array.isArray(lorebookData.entries)
-        ? lorebookData.entries.map((e: any) => ({
-            keywords: Array.isArray(e.keywords) ? e.keywords : (e.keywords ? [String(e.keywords)] : []),
-            context: typeof e.context === 'string' ? e.context : '',
-            isEnabled: e.isEnabled ?? true,
-            priority: typeof e.priority === 'number' ? e.priority : 0,
-          }))
-        : undefined,
+      entries: entries.length > 0 ? entries : undefined,
     };
 
     return this.createLorebook(userId, input);
