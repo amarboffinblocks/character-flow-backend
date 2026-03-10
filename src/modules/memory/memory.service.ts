@@ -35,6 +35,7 @@ async function getMemoryClient(): Promise<InstanceType<typeof import('mem0ai/oss
         embeddingDims: memory.embeddingDims,
       },
     },
+    
     vectorStore: {
       provider: 'qdrant',
       config: {
