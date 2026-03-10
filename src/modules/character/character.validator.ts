@@ -30,7 +30,7 @@ const scenarioSchema = z
 
 const summarySchema = z
   .string()
-  .max(2000, 'Summary must be at most 2000 characters')
+  .max(5000, 'Summary must be at most 2000 characters')
   .trim()
   .optional()
   .nullable();
