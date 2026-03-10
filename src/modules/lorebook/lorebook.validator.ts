@@ -108,7 +108,11 @@ export const createLorebookSchema = z.object({
   visibility: visibilitySchema.optional().default('private'),
   avatar: avatarSchema,
   tags: tagsSchema,
-  entries: z.array(createLorebookEntrySchema).max(300, 'Maximum 300 entries allowed').optional().default([]),
+  entries: z
+    .array(createLorebookEntrySchema)
+    .max(1000, 'Maximum 1000 entries allowed')
+    .optional()
+    .default([]),
   characterIds: uuidArraySchema,
   personaIds: uuidArraySchema,
 });
@@ -120,7 +124,10 @@ export const updateLorebookSchema = z.object({
   visibility: visibilitySchema.optional(),
   avatar: avatarSchema,
   tags: tagsSchema.optional(),
-  entries: z.array(createLorebookEntrySchema).max(300, 'Maximum 300 entries allowed').optional(),
+  entries: z
+    .array(createLorebookEntrySchema)
+    .max(1000, 'Maximum 1000 entries allowed')
+    .optional(),
   characterIds: uuidArraySchema,
   personaIds: uuidArraySchema,
   isFavourite: z.boolean().optional(),
