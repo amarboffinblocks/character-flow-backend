@@ -1,4 +1,5 @@
 import { lorebookRepository } from './lorebook.repository.js';
+import { tagService } from '../tag/index.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { prisma } from '../../lib/prisma.js';
@@ -136,6 +137,16 @@ export const lorebookService = {
       slug = generateSlug(input.name);
     }
 
+    // Sync tags to Tag collection (create missing, increment usage)
+    const createTagNames = Array.isArray(input.tags)
+      ? input.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+      : [];
+    const createRatingCategory = input.rating === 'NSFW' ? 'NSFW' : 'SFW';
+    if (createTagNames.length > 0) {
+      await tagService.getOrCreateTags(createTagNames, createRatingCategory);
+    }
+    const normalizedCreateTags = createTagNames.length > 0 ? createTagNames.map((n) => n.toLowerCase()) : (input.tags ?? []);
+
     const lorebookData: CreateLorebookData = {
       userId,
       name: input.name,
@@ -144,7 +155,7 @@ export const lorebookService = {
       rating: input.rating ?? 'SFW',
       visibility: input.visibility ?? 'private',
       avatar: input.avatar ?? null,
-      tags: input.tags ?? [],
+      tags: normalizedCreateTags,
     };
 
     // Create lorebook
@@ -235,12 +246,20 @@ export const lorebookService = {
 
     const entries = normalizeImportEntries(lorebookData.entries);
 
+    const tagNames = Array.isArray(lorebookData.tags)
+      ? lorebookData.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+      : [];
+    const ratingCategory = (lorebookData.rating === 'NSFW' || lorebookData.rating === 'SFW') ? lorebookData.rating : 'SFW';
+    if (tagNames.length > 0) {
+      await tagService.getOrCreateTags(tagNames, ratingCategory);
+    }
+
     const input: CreateLorebookInput = {
       name: lorebookData.name.trim(),
       description: lorebookData.description != null ? String(lorebookData.description).trim() : undefined,
-      rating: (lorebookData.rating === 'NSFW' || lorebookData.rating === 'SFW') ? lorebookData.rating : 'SFW',
+      rating: ratingCategory,
       visibility: (lorebookData.visibility === 'public' || lorebookData.visibility === 'private') ? lorebookData.visibility : 'private',
-      tags: Array.isArray(lorebookData.tags) ? lorebookData.tags.map((t: any) => String(t).trim()).filter(Boolean) : [],
+      tags: tagNames.map((n: string) => n.toLowerCase()),
       avatar: lorebookData.avatar && typeof lorebookData.avatar === 'object' ? lorebookData.avatar : undefined,
       entries: entries.length > 0 ? entries : undefined,
     };

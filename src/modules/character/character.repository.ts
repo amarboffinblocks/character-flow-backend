@@ -226,6 +226,7 @@ export const characterRepository = {
         personaId: data.personaId ?? null,
         lorebookId: data.lorebookId ?? null,
         realmId: data.realmId ?? null,
+        tokens: data.tokens ?? null,
       },
       include: {
         persona: true,
@@ -272,6 +273,7 @@ export const characterRepository = {
 
     if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
     if (data.isSaved !== undefined) updateData.isSaved = data.isSaved;
+    if (data.tokens !== undefined) updateData.tokens = data.tokens;
 
     return prisma.character.update({
       where: { id },

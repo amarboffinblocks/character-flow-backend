@@ -23,6 +23,7 @@ export interface CreateCharacterInput {
   personaId?: string;
   lorebookId?: string;
   realmId?: string;
+  tokens?: number;
 }
 
 export interface UpdateCharacterInput {
@@ -46,6 +47,7 @@ export interface UpdateCharacterInput {
   realmId?: string | null;
   isFavourite?: boolean;
   isSaved?: boolean;
+  tokens?: number | null;
 }
 
 export interface CharacterQueryParams {
@@ -109,6 +111,7 @@ export interface CreateCharacterData {
   personaId?: string | null;
   lorebookId?: string | null;
   realmId?: string | null;
+  tokens?: number | null;
 }
 
 export interface UpdateCharacterData {
@@ -133,5 +136,6 @@ export interface UpdateCharacterData {
   realmId?: string | null;
   isFavourite?: boolean;
   isSaved?: boolean;
+  tokens?: number | null;
 }
 

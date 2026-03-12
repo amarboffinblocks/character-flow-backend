@@ -4,6 +4,7 @@ import { sendSuccess, sendError } from '../../../utils/response.js';
 import { requireCurrentUser } from '../../../middleware/auth.middleware.js';
 import multer from 'multer';
 import { createError, formatZodErrorForResponse } from '../../../utils/errors.js';
+import { config } from '../../../config/index.js';
 
 // ============================================
 // Multer Configuration for Import
@@ -28,7 +29,7 @@ const fileFilter = (
 export const lorebookImportUpload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max
+    fileSize: config.upload.importMaxSize,
     files: 1,
   },
   fileFilter,
@@ -44,11 +45,15 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
   return new Promise<void>((resolve, reject) => {
     lorebookImportUpload(req, res, async (err) => {
       if (err) {
+        const isLimitError = (err as { code?: string }).code === 'LIMIT_FILE_SIZE';
+        const message = isLimitError
+          ? `File is too large. Maximum size for import is ${Math.round(config.upload.importMaxSize / 1024 / 1024)}MB.`
+          : err.message;
         res.status(400).json({
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: err.message,
+            message,
           },
         });
         return resolve();

@@ -1,7 +1,9 @@
 import { characterRepository } from './character.repository.js';
+import { tagService } from '../tag/index.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { normalizeCharacterData } from '../../utils/character-card.parser.js';
+import { calculateCharacterTokens } from '../../utils/character-tokens.js';
 import { prisma } from '../../lib/prisma.js';
 import {
   deleteFromS3IfExists,
@@ -85,6 +87,16 @@ export const characterService = {
       authorName = userActualName;
     }
 
+    // Sync tags to Tag collection (create missing, increment usage)
+    const createTagNames = Array.isArray(input.tags)
+      ? input.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+      : [];
+    const createRatingCategory = input.rating === 'NSFW' ? 'NSFW' : 'SFW';
+    if (createTagNames.length > 0) {
+      await tagService.getOrCreateTags(createTagNames, createRatingCategory);
+    }
+    const normalizedCreateTags = createTagNames.length > 0 ? createTagNames.map((n) => n.toLowerCase()) : (input.tags ?? []);
+
     const characterData: CreateCharacterData = {
       userId,
       name: input.name,
@@ -96,7 +108,7 @@ export const characterService = {
       visibility,
       avatar: input.avatar ?? null,
       backgroundImg: input.backgroundImg ?? null,
-      tags: input.tags ?? [],
+      tags: normalizedCreateTags,
       firstMessage: input.firstMessage ?? null,
       alternateMessages: input.alternateMessages ?? [],
       exampleDialogues: input.exampleDialogues ?? [],
@@ -106,6 +118,7 @@ export const characterService = {
       personaId: input.personaId ?? null,
       lorebookId: input.lorebookId ?? null,
       realmId: input.realmId ?? null,
+      tokens: input.tokens ?? calculateCharacterTokens(input),
     } as CreateCharacterData;
 
     const character = await characterRepository.createCharacter(characterData);
@@ -308,6 +321,36 @@ export const characterService = {
       }
     }
 
+    // When tags are updated, sync them to Tag collection
+    let tagsToStore: string[] | undefined;
+    if (input.tags !== undefined) {
+      const updateTagNames = Array.isArray(input.tags)
+        ? input.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+        : [];
+      const updateRatingCategory = (input.rating ?? existingCharacter.rating) === 'NSFW' ? 'NSFW' : 'SFW';
+      if (updateTagNames.length > 0) {
+        await tagService.getOrCreateTags(updateTagNames, updateRatingCategory);
+      }
+      tagsToStore = updateTagNames.length > 0 ? updateTagNames.map((n) => n.toLowerCase()) : [];
+    }
+
+    // Recalculate tokens when any token-bearing field is updated
+    const tokenFields = ['description', 'scenario', 'summary', 'firstMessage', 'alternateMessages', 'exampleDialogues'] as const;
+    const hasTokenFieldUpdate = tokenFields.some((f) => input[f] !== undefined);
+    const updatedTokens =
+      input.tokens !== undefined
+        ? input.tokens
+        : hasTokenFieldUpdate
+          ? calculateCharacterTokens({
+              description: input.description ?? existingCharacter.description,
+              scenario: input.scenario ?? existingCharacter.scenario,
+              summary: input.summary ?? existingCharacter.summary,
+              firstMessage: input.firstMessage ?? existingCharacter.firstMessage,
+              alternateMessages: input.alternateMessages ?? existingCharacter.alternateMessages ?? [],
+              exampleDialogues: input.exampleDialogues ?? existingCharacter.exampleDialogues ?? [],
+            })
+          : undefined;
+
     const updateData: UpdateCharacterData = {
       ...(input.name && { name: input.name }),
       ...(slug && { slug }),
@@ -318,7 +361,8 @@ export const characterService = {
       ...(input.visibility && { visibility: input.visibility }),
       ...(input.avatar !== undefined && { avatar: input.avatar }),
       ...(input.backgroundImg !== undefined && { backgroundImg: input.backgroundImg }),
-      ...(input.tags !== undefined && { tags: input.tags }),
+      ...(tagsToStore !== undefined && { tags: tagsToStore }),
+      ...(updatedTokens !== undefined && { tokens: updatedTokens }),
       ...(input.firstMessage !== undefined && { firstMessage: input.firstMessage }),
       ...(input.alternateMessages !== undefined && { alternateMessages: input.alternateMessages }),
       ...(input.exampleDialogues !== undefined && { exampleDialogues: input.exampleDialogues }),
@@ -723,6 +767,14 @@ export const characterService = {
           ? { url: characterData.backgroundImg }
           : null;
 
+    const tagNames = Array.isArray(characterData.tags)
+      ? characterData.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+      : [];
+    const ratingCategory = characterData.rating === 'NSFW' ? 'NSFW' : 'SFW';
+    if (tagNames.length > 0) {
+      await tagService.getOrCreateTags(tagNames, ratingCategory);
+    }
+
     // Map imported data to CreateCharacterData (supports V1, V2 JSON and PNG metadata)
     const createData: CreateCharacterData = {
       userId,
@@ -735,7 +787,7 @@ export const characterService = {
       visibility,
       avatar: avatarObj,
       backgroundImg: backgroundObj,
-      tags: Array.isArray(characterData.tags) ? characterData.tags : [],
+      tags: tagNames.length > 0 ? tagNames.map((n: string) => n.toLowerCase()) : (Array.isArray(characterData.tags) ? characterData.tags : []),
       firstMessage: characterData.firstMessage ?? null,
       alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],
       exampleDialogues: Array.isArray(characterData.exampleDialogues) ? characterData.exampleDialogues : [],
@@ -745,6 +797,7 @@ export const characterService = {
       personaId: null, // Don't import relationships
       lorebookId: null,
       realmId: null,
+      tokens: calculateCharacterTokens(characterData),
     };
 
     const character = await characterRepository.createCharacter(createData);
@@ -833,6 +886,14 @@ export const characterService = {
               ? { url: characterData.backgroundImg }
               : null;
 
+        const bulkTagNames = Array.isArray(characterData.tags)
+          ? characterData.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+          : [];
+        const bulkRatingCategory = characterData.rating === 'NSFW' ? 'NSFW' : 'SFW';
+        if (bulkTagNames.length > 0) {
+          await tagService.getOrCreateTags(bulkTagNames, bulkRatingCategory);
+        }
+
         // Map imported data to CreateCharacterData
         const createData: CreateCharacterData = {
           userId,
@@ -845,7 +906,7 @@ export const characterService = {
           visibility,
           avatar: avatarObj,
           backgroundImg: backgroundObj,
-          tags: Array.isArray(characterData.tags) ? characterData.tags : [],
+          tags: bulkTagNames.length > 0 ? bulkTagNames.map((n) => n.toLowerCase()) : (Array.isArray(characterData.tags) ? characterData.tags : []),
           firstMessage: characterData.firstMessage ?? null,
           alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],
           exampleDialogues: Array.isArray(characterData.exampleDialogues) ? characterData.exampleDialogues : [],
@@ -855,6 +916,7 @@ export const characterService = {
           personaId: null, // Don't import relationships
           lorebookId: null,
           realmId: null,
+          tokens: calculateCharacterTokens(characterData),
         };
 
         const character = await characterRepository.createCharacter(createData);

@@ -2,10 +2,15 @@
  * Character Card Parser
  * Supports V1, V2 formats from JSON and PNG/JPEG with embedded metadata
  * Compatible with TavernAI, SillyTavern, and Character Card spec
+ * Supports tEXt and iTXt PNG chunks (keyword: chara, chara_card_v2, ccv3)
  */
 
 import extract from 'png-chunks-extract';
+import { inflateSync } from 'node:zlib';
 import { createError } from './errors.js';
+
+/** Character card tEXt/iTXt chunk keywords (case-insensitive) */
+const CARD_KEYWORDS = ['chara', 'chara_card_v2', 'ccv3'] as const;
 
 // ============================================
 // Types
@@ -98,28 +103,93 @@ function decodeTextChunk(data: Uint8Array): { keyword: string; value: string } {
 }
 
 /**
+ * Decode iTXt chunk: keyword, compression flag, method, language, translated keyword, then text (UTF-8 or zlib)
+ * iTXt allows UTF-8 and is used by many character card exporters.
+ */
+function decodeITxtChunk(data: Uint8Array): { keyword: string; value: string } {
+  let i = 0;
+  while (i < data.length && data[i] !== 0) i++;
+  const keyword = i > 0 ? new TextDecoder('latin1').decode(data.subarray(0, i)) : '';
+  if (i >= data.length) return { keyword, value: '' };
+  i++; // skip null
+  const compressionFlag = data[i] ?? 0;
+  i += 2; // compression method (0 = deflate)
+  while (i < data.length && data[i] !== 0) i++;
+  i++; // skip null (language)
+  while (i < data.length && data[i] !== 0) i++;
+  i++; // skip null (translated keyword)
+  if (i >= data.length) return { keyword, value: '' };
+  const payload = data.subarray(i);
+  let value: string;
+  if (compressionFlag === 1) {
+    try {
+      value = inflateSync(Buffer.from(payload)).toString('utf-8');
+    } catch {
+      value = new TextDecoder('utf-8').decode(payload);
+    }
+  } else {
+    value = new TextDecoder('utf-8').decode(payload);
+  }
+  return { keyword, value };
+}
+
+function isCardKeyword(keyword: string): keyword is (typeof CARD_KEYWORDS)[number] {
+  const lower = keyword.toLowerCase();
+  return CARD_KEYWORDS.some((k) => k === lower);
+}
+
+function formatFromKeyword(keyword: string): 'v1' | 'v2' | 'v3' {
+  const lower = keyword.toLowerCase();
+  if (lower === 'ccv3') return 'v3';
+  if (lower === 'chara_card_v2') return 'v2';
+  return 'v1';
+}
+
+/**
+ * Decode zTXt chunk: keyword (null-terminated), compression method (1 byte), then deflate-compressed value
+ */
+function decodeZTxtChunk(data: Uint8Array): { keyword: string; value: string } {
+  let i = 0;
+  while (i < data.length && data[i] !== 0) i++;
+  const keyword = i > 0 ? new TextDecoder('latin1').decode(data.subarray(0, i)) : '';
+  if (i >= data.length) return { keyword, value: '' };
+  i++; // skip null
+  const payload = data.subarray(i);
+  try {
+    const value = inflateSync(Buffer.from(payload)).toString('utf-8');
+    return { keyword, value };
+  } catch {
+    return { keyword, value: '' };
+  }
+}
+
+/**
  * Extract character card JSON from PNG buffer
- * Supports: chara (V1), chara_card_v2 (V2), ccv3 (V3 - falls back to data)
+ * Supports tEXt and iTXt chunks with keyword: chara (V1), chara_card_v2 (V2), or ccv3 (V3).
+ * Keyword matching is case-insensitive.
  */
 export function extractCharacterDataFromPng(buffer: Buffer): { data: unknown; format: 'v1' | 'v2' | 'v3' } {
   const chunks = extract(buffer);
 
-  // Look for character card tEXt chunks (chara, chara_card_v2, ccv3)
-  const textChunks = chunks.filter((c) => c.name === 'tEXt');
+  const textChunks = chunks.filter((c) => c.name === 'tEXt' || c.name === 'iTXt' || c.name === 'zTXt');
   let rawData: string | null = null;
   let format: 'v1' | 'v2' | 'v3' = 'v1';
 
   for (const chunk of textChunks) {
-    const { keyword, value } = decodeTextChunk(new Uint8Array(chunk.data));
-    if (keyword === 'ccv3' || keyword === 'chara_card_v2' || keyword === 'chara') {
+    const data = new Uint8Array(chunk.data);
+    const { keyword, value } =
+      chunk.name === 'iTXt' ? decodeITxtChunk(data) : chunk.name === 'zTXt' ? decodeZTxtChunk(data) : decodeTextChunk(data);
+    if (isCardKeyword(keyword) && value && value.trim() !== '') {
       rawData = value;
-      format = keyword === 'ccv3' ? 'v3' : keyword === 'chara_card_v2' ? 'v2' : 'v1';
+      format = formatFromKeyword(keyword);
       break;
     }
   }
 
   if (!rawData || rawData.trim() === '') {
-    throw createError.badRequest('PNG file does not contain character card metadata. Expected tEXt chunks: chara, chara_card_v2, or ccv3.');
+    throw createError.badRequest(
+      'PNG file does not contain character card metadata. Expected tEXt, iTXt, or zTXt chunks with keyword: chara, chara_card_v2, or ccv3 (case-insensitive).'
+    );
   }
 
   try {

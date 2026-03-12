@@ -1,4 +1,5 @@
 import { personaRepository } from './persona.repository.js';
+import { tagService } from '../tag/index.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { processImageUpload } from '../../utils/image.helper.js';
@@ -49,6 +50,16 @@ export const personaService = {
       // For now, we'll let Prisma handle foreign key constraints
     }
 
+    // Sync tags to Tag collection (create missing, increment usage)
+    const createTagNames = Array.isArray(input.tags)
+      ? input.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+      : [];
+    const createRatingCategory = input.rating === 'NSFW' ? 'NSFW' : 'SFW';
+    if (createTagNames.length > 0) {
+      await tagService.getOrCreateTags(createTagNames, createRatingCategory);
+    }
+    const normalizedCreateTags = createTagNames.length > 0 ? createTagNames.map((n) => n.toLowerCase()) : (input.tags ?? []);
+
     const personaData: CreatePersonaData = {
       userId,
       name: input.name,
@@ -58,7 +69,7 @@ export const personaService = {
       visibility: input.visibility ?? 'private',
       avatar: input.avatar ?? null,
       backgroundImg: input.backgroundImg ?? null,
-      tags: input.tags ?? [],
+      tags: normalizedCreateTags,
       lorebookId: input.lorebookId ?? null,
     };
 
@@ -476,6 +487,14 @@ export const personaService = {
       }
     }
 
+    const tagNames = Array.isArray(personaData.tags)
+      ? personaData.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
+      : [];
+    const ratingCategory = personaData.rating === 'NSFW' ? 'NSFW' : 'SFW';
+    if (tagNames.length > 0) {
+      await tagService.getOrCreateTags(tagNames, ratingCategory);
+    }
+
     // Map imported data to CreatePersonaData
     const createData: CreatePersonaData = {
       userId,
@@ -486,7 +505,7 @@ export const personaService = {
       visibility: personaData.visibility ?? 'private',
       avatar,
       backgroundImg: personaData.backgroundImg ? (typeof personaData.backgroundImg === 'string' ? { url: personaData.backgroundImg } : personaData.backgroundImg) : null,
-      tags: Array.isArray(personaData.tags) ? personaData.tags : [],
+      tags: tagNames.length > 0 ? tagNames.map((n: string) => n.toLowerCase()) : [],
       lorebookId: null, // Don't import relationships
     };
 

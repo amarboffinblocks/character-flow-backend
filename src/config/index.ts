@@ -29,6 +29,8 @@ const envSchema = z.object({
 
     // File Upload
     UPLOAD_MAX_SIZE: z.string().default('10485760'),
+    /** Max size for character/persona/lorebook import files (bytes). Default 50MB. */
+    IMPORT_MAX_SIZE: z.string().optional().default('52428800'),
     UPLOAD_ALLOWED_TYPES: z.string().default('image/jpeg,image/png,image/webp,image/gif'),
     UPLOAD_DIR: z.string().default('./uploads'),
 
@@ -120,6 +122,8 @@ export const config = {
 
     upload: {
         maxSize: parseInt(env.UPLOAD_MAX_SIZE, 10),
+        /** Max file size for character/persona/lorebook imports (default 50MB). */
+        importMaxSize: parseInt(env.IMPORT_MAX_SIZE, 10),
         allowedTypes: env.UPLOAD_ALLOWED_TYPES.split(','),
         dir: env.UPLOAD_DIR,
     },
