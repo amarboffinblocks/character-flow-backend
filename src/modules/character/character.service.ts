@@ -342,13 +342,13 @@ export const characterService = {
         ? input.tokens
         : hasTokenFieldUpdate
           ? calculateCharacterTokens({
-              description: input.description ?? existingCharacter.description,
-              scenario: input.scenario ?? existingCharacter.scenario,
-              summary: input.summary ?? existingCharacter.summary,
-              firstMessage: input.firstMessage ?? existingCharacter.firstMessage,
-              alternateMessages: input.alternateMessages ?? existingCharacter.alternateMessages ?? [],
-              exampleDialogues: input.exampleDialogues ?? existingCharacter.exampleDialogues ?? [],
-            })
+            description: input.description ?? existingCharacter.description,
+            scenario: input.scenario ?? existingCharacter.scenario,
+            summary: input.summary ?? existingCharacter.summary,
+            firstMessage: input.firstMessage ?? existingCharacter.firstMessage,
+            alternateMessages: input.alternateMessages ?? existingCharacter.alternateMessages ?? [],
+            exampleDialogues: input.exampleDialogues ?? existingCharacter.exampleDialogues ?? [],
+          })
           : undefined;
 
     const updateData: UpdateCharacterData = {
@@ -770,7 +770,14 @@ export const characterService = {
     const tagNames = Array.isArray(characterData.tags)
       ? characterData.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
       : [];
-    const ratingCategory = characterData.rating === 'NSFW' ? 'NSFW' : 'SFW';
+
+    let ratingCategory: "SFW" | "NSFW" = characterData.rating === 'NSFW' ? 'NSFW' : 'SFW';
+    if (tagNames.some((t: string) => t.toLowerCase() === 'nsfw')) {
+      ratingCategory = 'NSFW';
+    } else if (tagNames.some((t: string) => t.toLowerCase() === 'sfw')) {
+      ratingCategory = 'SFW';
+    }
+
     if (tagNames.length > 0) {
       await tagService.getOrCreateTags(tagNames, ratingCategory);
     }
@@ -783,7 +790,7 @@ export const characterService = {
       description: characterData.description ?? null,
       scenario: characterData.scenario ?? null,
       summary: characterData.summary ?? null,
-      rating: characterData.rating ?? 'SFW',
+      rating: ratingCategory,
       visibility,
       avatar: avatarObj,
       backgroundImg: backgroundObj,
@@ -889,7 +896,14 @@ export const characterService = {
         const bulkTagNames = Array.isArray(characterData.tags)
           ? characterData.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
           : [];
-        const bulkRatingCategory = characterData.rating === 'NSFW' ? 'NSFW' : 'SFW';
+
+        let bulkRatingCategory: "SFW" | "NSFW" = characterData.rating === 'NSFW' ? 'NSFW' : 'SFW';
+        if (bulkTagNames.some((t: string) => t.toLowerCase() === 'nsfw')) {
+          bulkRatingCategory = 'NSFW';
+        } else if (bulkTagNames.some((t: string) => t.toLowerCase() === 'sfw')) {
+          bulkRatingCategory = 'SFW';
+        }
+
         if (bulkTagNames.length > 0) {
           await tagService.getOrCreateTags(bulkTagNames, bulkRatingCategory);
         }
@@ -902,7 +916,7 @@ export const characterService = {
           description: characterData.description ?? null,
           scenario: characterData.scenario ?? null,
           summary: characterData.summary ?? null,
-          rating: characterData.rating ?? 'SFW',
+          rating: bulkRatingCategory,
           visibility,
           avatar: avatarObj,
           backgroundImg: backgroundObj,

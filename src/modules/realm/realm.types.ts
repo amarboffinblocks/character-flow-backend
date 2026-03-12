@@ -33,6 +33,7 @@ export interface RealmQueryParams {
     rating?: Rating;
     visibility?: Visibility;
     tags?: string[];
+    excludeTags?: string[];
     isFavourite?: boolean;
     sortBy?: 'createdAt' | 'updatedAt' | 'name';
     sortOrder?: 'asc' | 'desc';

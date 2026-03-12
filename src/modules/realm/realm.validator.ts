@@ -75,6 +75,10 @@ export const realmQuerySchema = z.object({
         .string()
         .optional()
         .transform((val) => (val ? val.split(',').map((tag) => tag.trim()).filter(Boolean) : undefined)),
+    excludeTags: z
+        .string()
+        .optional()
+        .transform((val) => (val ? val.split(',').map((tag) => tag.trim()).filter(Boolean) : undefined)),
     isFavourite: z
         .string()
         .optional()

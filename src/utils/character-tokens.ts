@@ -11,7 +11,7 @@ function textLength(value: string | null | undefined): number {
 }
 
 function arrayLengths(arr: unknown[]): number {
-  return arr.reduce((sum, item) => sum + textLength(typeof item === 'string' ? item : String(item)), 0);
+  return arr.reduce((sum: number, item) => sum + textLength(typeof item === 'string' ? item : String(item)), 0);
 }
 
 export interface CharacterTokenSource {

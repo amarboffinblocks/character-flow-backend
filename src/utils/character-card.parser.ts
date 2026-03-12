@@ -294,13 +294,21 @@ export function normalizeCharacterData(raw: unknown): NormalizedCharacterData {
   const avatar = (data.avatar ?? (raw as Record<string, unknown>)?.avatar) as string | undefined;
   const tags = (data.tags ?? (raw as Record<string, unknown>)?.tags) as string[] | string | undefined;
 
+  const parsedTags = Array.isArray(tags) ? tags.map(String).map((t) => t.trim()).filter(Boolean) : typeof tags === 'string' ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
+  let rating: 'SFW' | 'NSFW' = 'SFW';
+  if (parsedTags.some((t: string) => t.toLowerCase() === 'nsfw')) {
+    rating = 'NSFW';
+  } else if (parsedTags.some((t: string) => t.toLowerCase() === 'sfw')) {
+    rating = 'SFW';
+  }
+
   return {
     name: String(name).trim(),
     description: description ? String(description).trim() : null,
     scenario: scenario ? String(scenario).trim() : null,
     summary: personality ? String(personality).trim() : null,
-    rating: 'SFW',
-    tags: Array.isArray(tags) ? tags.map(String) : typeof tags === 'string' ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+    rating,
+    tags: parsedTags,
     firstMessage: firstMes ? String(firstMes).trim() : null,
     alternateMessages: Array.isArray(altGreetings) ? altGreetings.map(String) : [],
     exampleDialogues: parseExampleDialogues(mesExample),

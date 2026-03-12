@@ -18,7 +18,7 @@ export const lorebookRepository = {
   // ============================================
 
   async findLorebookById(id: string): Promise<Lorebook | null> {
-    return prisma.lorebook.findUnique({
+    const lorebook = await prisma.lorebook.findUnique({
       where: { id },
       include: {
         entries: {
@@ -27,6 +27,11 @@ export const lorebookRepository = {
             { createdAt: 'asc' },
           ],
         },
+        _count: {
+          select: {
+            entries: true,
+          },
+        },
         characters: {
           select: {
             id: true,
@@ -41,10 +46,18 @@ export const lorebookRepository = {
         },
       },
     });
+
+    if (!lorebook) return null;
+
+    const { _count, ...lorebookData } = lorebook as any;
+    return {
+      ...lorebookData,
+      entriesCount: _count?.entries ?? 0,
+    } as Lorebook;
   },
 
   async findLorebookBySlug(slug: string): Promise<Lorebook | null> {
-    return prisma.lorebook.findUnique({
+    const lorebook = await prisma.lorebook.findUnique({
       where: { slug },
       include: {
         entries: {
@@ -53,6 +66,11 @@ export const lorebookRepository = {
             { createdAt: 'asc' },
           ],
         },
+        _count: {
+          select: {
+            entries: true,
+          },
+        },
         characters: {
           select: {
             id: true,
@@ -67,10 +85,18 @@ export const lorebookRepository = {
         },
       },
     });
+
+    if (!lorebook) return null;
+
+    const { _count, ...lorebookData } = lorebook as any;
+    return {
+      ...lorebookData,
+      entriesCount: _count?.entries ?? 0,
+    } as Lorebook;
   },
 
   async findLorebookBySlugAndUser(slug: string, userId: string): Promise<Lorebook | null> {
-    return prisma.lorebook.findFirst({
+    const lorebook = await prisma.lorebook.findFirst({
       where: {
         slug,
         userId,
@@ -82,8 +108,21 @@ export const lorebookRepository = {
             { createdAt: 'asc' },
           ],
         },
+        _count: {
+          select: {
+            entries: true,
+          },
+        },
       },
     });
+
+    if (!lorebook) return null;
+
+    const { _count, ...lorebookData } = lorebook as any;
+    return {
+      ...lorebookData,
+      entriesCount: _count?.entries ?? 0,
+    } as Lorebook;
   },
 
   async findLorebooksByUser(

@@ -37,6 +37,7 @@ export const realmRepository = {
             rating,
             visibility,
             tags,
+            excludeTags,
             isFavourite,
             sortBy = 'createdAt',
             sortOrder = 'desc',
@@ -52,7 +53,16 @@ export const realmRepository = {
         if (rating) where.rating = rating as Rating;
         if (visibility) where.visibility = visibility as Visibility;
         if (isFavourite !== undefined) where.isFavourite = isFavourite;
-        if (tags && tags.length > 0) where.tags = { hasEvery: tags };
+
+        if (tags && tags.length > 0) {
+            where.tags = { hasEvery: tags };
+        }
+
+        if (excludeTags && excludeTags.length > 0) {
+            where.NOT = [
+                { tags: { hasSome: excludeTags } },
+            ];
+        }
 
         if (search) {
             where.OR = [

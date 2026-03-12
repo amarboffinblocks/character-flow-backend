@@ -26,7 +26,7 @@ export class AppError extends Error {
     this.timestamp = new Date();
 
     Object.setPrototypeOf(this, AppError.prototype);
-    
+
     // Maintain proper stack trace
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, this.constructor);
@@ -162,11 +162,13 @@ export function formatZodErrorForResponse(error: unknown): {
     code: err.code || 'invalid_type',
   }));
   const first = issues[0];
-  const firstField = (first.path || []).join('.');
+  if (!first) return { message: 'Validation failed. Please check your input.', details };
+
+  const firstField = first.path ? first.path.join('.') : '';
   const message =
     issues.length === 1
-      ? `Validation failed: ${firstField} ${first.message}`
-      : `Validation failed: ${issues.length} error(s). First: ${firstField} - ${first.message}`;
+      ? `Validation failed: ${firstField} ${first.message || 'Validation error'}`
+      : `Validation failed: ${issues.length} error(s). First: ${firstField} - ${first.message || 'Validation error'}`;
   return { message, details };
 }
 

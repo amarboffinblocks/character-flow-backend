@@ -29,6 +29,7 @@ export const GET = async (req: Request, res: Response): Promise<void> => {
         rating: queryParams.rating,
         visibility: queryParams.visibility,
         tags: queryParams.tags,
+        excludeTags: queryParams.excludeTags,
         isFavourite: queryParams.isFavourite,
         sortBy: queryParams.sortBy,
         sortOrder: queryParams.sortOrder,

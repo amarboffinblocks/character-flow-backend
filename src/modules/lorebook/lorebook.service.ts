@@ -249,7 +249,14 @@ export const lorebookService = {
     const tagNames = Array.isArray(lorebookData.tags)
       ? lorebookData.tags.map((t: unknown) => String(t).trim()).filter(Boolean)
       : [];
-    const ratingCategory = (lorebookData.rating === 'NSFW' || lorebookData.rating === 'SFW') ? lorebookData.rating : 'SFW';
+
+    let ratingCategory: "SFW" | "NSFW" = (lorebookData.rating === 'NSFW' || lorebookData.rating === 'SFW') ? lorebookData.rating : 'SFW';
+    if (tagNames.some((t: string) => t.toLowerCase() === 'nsfw')) {
+      ratingCategory = 'NSFW';
+    } else if (tagNames.some((t: string) => t.toLowerCase() === 'sfw')) {
+      ratingCategory = 'SFW';
+    }
+
     if (tagNames.length > 0) {
       await tagService.getOrCreateTags(tagNames, ratingCategory);
     }

@@ -42,6 +42,7 @@ export const emailService = {
     subject: string;
     html: string;
     text?: string;
+    attachments?: { filename: string; content?: Buffer | string; path?: string; contentType?: string }[];
   }): Promise<boolean> {
     const mailTransporter = getTransporter();
 
@@ -98,6 +99,7 @@ export const emailService = {
         subject: options.subject,
         html: options.html,
         text: options.text,
+        attachments: options.attachments,
       };
 
       const info = await mailTransporter.sendMail(mailOptions);
@@ -237,6 +239,63 @@ export const emailService = {
         </html>
       `,
       text: `Your youruniverse.ai verification code is: ${code}. Valid for 5 minutes.`,
+    });
+  },
+
+  /**
+   * Send feature request or bug report to admin
+   */
+  async sendFeatureRequestEmail(data: {
+    title: string;
+    priority: string;
+    category: string;
+    platform: string;
+    operatingSystem?: string;
+    description: string;
+    additionalDetails?: string;
+    requesterUsername: string;
+    requesterEmail: string;
+    attachments?: { filename: string; content: Buffer; contentType: string }[];
+  }): Promise<boolean> {
+    const adminEmail = config.email.user || ''; // Send to the configured system admin email
+    const subjectPrefix = data.category === 'Bug Report' ? '[BUG REPORT]' : '[FEATURE REQUEST]';
+
+    return this.sendEmail({
+      to: adminEmail,
+      subject: `${subjectPrefix} - ${data.title} (${data.priority.toUpperCase()})`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">New Submission Received</h1>
+          </div>
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px;">Submission Details</h2>
+            <p><strong>Title:</strong> ${data.title}</p>
+            <p><strong>Requester:</strong> ${data.requesterUsername} (<a href="mailto:${data.requesterEmail}">${data.requesterEmail}</a>)</p>
+            <p><strong>Priority:</strong> <span style="background: #eee; padding: 3px 8px; border-radius: 4px;">${data.priority}</span></p>
+            <p><strong>Category:</strong> ${data.category}</p>
+            <p><strong>Platform:</strong> ${data.platform}</p>
+            ${data.operatingSystem ? `<p><strong>Operating System:</strong> ${data.operatingSystem}</p>` : ''}
+            
+            <h3 style="margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Description</h3>
+            <div style="background: #fff; padding: 15px; border-left: 4px solid #1e3c72; border-radius: 4px; white-space: pre-wrap;">${data.description}</div>
+            
+            ${data.additionalDetails ? `
+              <h3 style="margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Additional Details</h3>
+              <div style="background: #fff; padding: 15px; border-left: 4px solid #666; border-radius: 4px; white-space: pre-wrap;">${data.additionalDetails}</div>
+            ` : ''}
+          </div>
+        </body>
+        </html>
+      `,
+      text: `New Submission: ${data.title}\nRequester: ${data.requesterUsername} (${data.requesterEmail})\nPriority: ${data.priority}\nCategory: ${data.category}\nPlatform: ${data.platform}\n\nDescription:\n${data.description}`,
+      attachments: data.attachments,
     });
   },
 };
