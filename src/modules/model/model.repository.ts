@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
-import type { Model, ModelQueryParams } from './model.types.js';
+import type { Model, ModelQueryParams, ModelConfig } from './model.types.js';
 
 // Prisma client delegate for Model (table "models"). Use getModelDelegate() so we fail fast if schema wasn't generated.
 const getModelDelegate = () => {
@@ -58,7 +58,9 @@ export const modelRepository = {
     isActive?: boolean;
     isDefault?: boolean;
     metadata?: unknown;
+    config?: ModelConfig;
   }): Promise<Model> {
+    const metadata = mergeConfigIntoMetadata(data.metadata, data.config);
     return getModelDelegate().create({
       data: {
         name: data.name,
@@ -68,8 +70,46 @@ export const modelRepository = {
         modelName: data.modelName ?? undefined,
         isActive: data.isActive ?? true,
         isDefault: data.isDefault ?? false,
-        metadata: data.metadata ? (data.metadata as any) : undefined,
+        metadata: metadata ? (metadata as object) : undefined,
+      },
+    });
+  },
+
+  async updateModel(
+    id: string,
+    data: {
+      name?: string;
+      description?: string | null;
+      provider?: 'openai' | 'gemini' | 'aws' | 'anthropic' | 'local';
+      modelName?: string | null;
+      isActive?: boolean;
+      isDefault?: boolean;
+      metadata?: unknown;
+      config?: ModelConfig;
+    }
+  ): Promise<Model> {
+    const existing = await getModelDelegate().findUnique({ where: { id } });
+    if (!existing) return null as unknown as Model;
+    const metadata = mergeConfigIntoMetadata(data.metadata ?? existing.metadata, data.config);
+    return getModelDelegate().update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.provider !== undefined && { provider: data.provider }),
+        ...(data.modelName !== undefined && { modelName: data.modelName }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.isDefault !== undefined && { isDefault: data.isDefault }),
+        ...(metadata !== undefined && { metadata: metadata as object }),
       },
     });
   },
 };
+
+function mergeConfigIntoMetadata(metadata: unknown, config?: ModelConfig): unknown {
+  const base = metadata != null && typeof metadata === 'object' && !Array.isArray(metadata)
+    ? (metadata as Record<string, unknown>)
+    : {};
+  if (!config) return Object.keys(base).length ? base : undefined;
+  return { ...base, config };
+}

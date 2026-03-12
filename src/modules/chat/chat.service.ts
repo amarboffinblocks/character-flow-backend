@@ -2,6 +2,7 @@ import { chatRepository } from './chat.repository.js';
 import { characterRepository } from '../character/character.repository.js';
 import { modelService } from '../model/index.js';
 import { modelRepository } from '../model/model.repository.js';
+import { parseModelConfig } from '../model/model.types.js';
 import { createError } from '../../utils/index.js';
 import { logger } from '../../lib/logger.js';
 import type {
@@ -76,19 +77,12 @@ export const chatService = {
   },
 
   async createChat(userId: string, input: CreateChatInput): Promise<ChatResponse> {
-    // Validate model if provided, otherwise use default model
-    let modelId = input.modelId;
-
-    if (modelId) {
-      await modelService.validateModelExists(modelId);
-    } else {
-      // Use default model if no modelId provided
-      const defaultModel = await modelRepository.findDefaultModel();
-      if (!defaultModel || !defaultModel.isActive) {
-        throw createError.badRequest('No active model available. Please select a model or ensure a default model is configured.');
-      }
-      modelId = defaultModel.id;
+    // Chat always uses the default model
+    const defaultModel = await modelRepository.findDefaultModel();
+    if (!defaultModel || !defaultModel.isActive) {
+      throw createError.badRequest('No active model available. Please select a model or ensure a default model is configured.');
     }
+    const modelId = defaultModel.id;
 
     const data: CreateChatData = {
       userId,
@@ -149,20 +143,18 @@ export const chatService = {
   },
 
   /**
-   * Validate that a chat has a model selected
-   * This should be called before sending messages to ensure a model is selected
+   * Validate that the default model is available for chat
+   * This should be called before sending messages to ensure a default model is configured
    */
   async validateChatHasModel(chatId: string, userId: string): Promise<void> {
     const chat = await chatRepository.findChatByIdAndUser(chatId, userId);
     if (!chat) {
       throw createError.notFound('Chat not found');
     }
-    const modelId = (chat as { modelId?: string | null }).modelId;
-    if (!modelId) {
-      throw createError.badRequest('A model must be selected before sending messages. Please select a model for this chat.');
+    const defaultModel = await modelRepository.findDefaultModel();
+    if (!defaultModel || !defaultModel.isActive) {
+      throw createError.badRequest('No active model available. Please select a model from Model Selection or the chat panel.');
     }
-    // Also validate that the model exists and is active
-    await modelService.validateModelExists(modelId);
   },
 
   // ============================================
@@ -230,19 +222,13 @@ export const chatService = {
       throw createError.notFound('Chat not found');
     }
 
-    let modelId = (chat as { modelId?: string | null }).modelId;
-    let model = modelId ? await modelRepository.findModelById(modelId) : null;
-
-    if (!modelId || !model || !model.isActive) {
-      const defaultModel = await modelRepository.findDefaultModel();
-      if (!defaultModel || !defaultModel.isActive) {
-        throw createError.badRequest('No active model available. Please select a model or ensure a default model is configured.');
-      }
-      model = defaultModel;
-      modelId = defaultModel.id;
+    // Chat always uses the default model for sending messages
+    const defaultModel = await modelRepository.findDefaultModel();
+    if (!defaultModel || !defaultModel.isActive) {
+      throw createError.badRequest('No active model available. Please select a model or ensure a default model is configured.');
     }
 
-    return { chat, model, modelId };
+    return { chat, model: defaultModel, modelId: defaultModel.id };
   },
 
   // ============================================
@@ -324,6 +310,7 @@ export const chatService = {
     });
 
     const messages = toModelMessages(orchestratorResult.messages);
+    const modelConfig = parseModelConfig(model.metadata);
 
     const logContext = { chatId, userId, messageId: userMessage.id };
 
@@ -342,8 +329,11 @@ export const chatService = {
       provider,
       model: model.modelName ?? undefined,
       messages,
-      temperature: orchestratorResult.temperature,
-      maxTokens: orchestratorResult.maxTokens,
+      temperature: modelConfig.temperature,
+      maxTokens: modelConfig.maxTokens,
+      topP: modelConfig.topP,
+      frequencyPenalty: modelConfig.frequencyPenalty,
+      presencePenalty: modelConfig.presencePenalty,
       logContext,
 
       onFinish: async ({ text }) => {
@@ -392,7 +382,7 @@ export const chatService = {
     chatId: string,
     userId: string,
     assistantMessageId: string,
-    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null }; provider: ReturnType<typeof mapProviderToModelProvider> }
+    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null; metadata?: unknown }; provider: ReturnType<typeof mapProviderToModelProvider> }
   ): Promise<SendMessageStreamResponse> {
     const { chat, model, provider } = ctx;
 
@@ -457,6 +447,7 @@ export const chatService = {
     });
 
     const messages = toModelMessages(orchestratorResult.messages);
+    const modelConfig = parseModelConfig(model.metadata);
     const logContext = { chatId, userId, messageId: userMsg.id };
 
     logger.info(
@@ -474,8 +465,11 @@ export const chatService = {
       provider,
       model: model.modelName ?? undefined,
       messages,
-      temperature: orchestratorResult.temperature,
-      maxTokens: orchestratorResult.maxTokens,
+      temperature: modelConfig.temperature,
+      maxTokens: modelConfig.maxTokens,
+      topP: modelConfig.topP,
+      frequencyPenalty: modelConfig.frequencyPenalty,
+      presencePenalty: modelConfig.presencePenalty,
       logContext,
 
       onFinish: async ({ text }) => {

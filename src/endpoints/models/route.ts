@@ -5,6 +5,7 @@ import { sendSuccess } from '../../utils/response.js';
 import { sendError } from '../../utils/response.js';
 import { logger } from '../../lib/logger.js';
 import type { Model } from '../../modules/model/model.types.js';
+import { parseModelConfig } from '../../modules/model/model.types.js';
 
 // Serialize model for JSON response (avoids BigInt/custom types from DB breaking res.json())
 // Defensive for production: Prisma may return Date or ISO string depending on driver/config
@@ -22,6 +23,7 @@ function serializeModel(m: Model | Record<string, unknown>) {
     isActive: Boolean(raw.isActive),
     isDefault: Boolean(raw.isDefault),
     metadata: raw.metadata ?? null,
+    config: parseModelConfig(raw.metadata),
     createdAt: toDate(raw.createdAt),
     updatedAt: toDate(raw.updatedAt),
   };

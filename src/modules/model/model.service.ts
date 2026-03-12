@@ -5,6 +5,7 @@ import type {
   ModelListResponse,
   ModelQueryParams,
   CreateModelInput,
+  UpdateModelInput,
 } from './model.types.js';
 
 // ============================================
@@ -59,6 +60,15 @@ export const modelService = {
     }
 
     const model = await modelRepository.createModel(input);
+    return { model };
+  },
+
+  async updateModel(id: string, input: UpdateModelInput): Promise<ModelResponse> {
+    const existing = await modelRepository.findModelById(id);
+    if (!existing) {
+      throw createError.notFound('Model not found');
+    }
+    const model = await modelRepository.updateModel(id, input);
     return { model };
   },
 };

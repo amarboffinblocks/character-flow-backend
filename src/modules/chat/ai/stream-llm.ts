@@ -10,12 +10,23 @@ const SMOOTH_STREAM_CONFIG = {
 
 export type StreamLLMResult = ReturnType<typeof streamText>;
 
+export type ModelConfigInput = {
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+};
+
 type StreamLLMInput = {
   provider: ModelProvider;
   model?: string;
   messages: ModelMessage[];
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
   onFinish?: (params: { text: string }) => void | Promise<void>;
   onError?: (params: { error: unknown }) => void;
   /** Called when stream fails midway; receives partial text for persistence */
@@ -30,6 +41,9 @@ export function streamLLM({
   messages,
   temperature = 0.7,
   maxTokens,
+  topP,
+  frequencyPenalty,
+  presencePenalty,
   onFinish,
   onError,
   onPartialSave,
@@ -46,6 +60,9 @@ export function streamLLM({
     messages,
     temperature,
     ...(maxTokens != null && { maxTokens }),
+    ...(topP != null && { topP }),
+    ...(frequencyPenalty != null && { frequencyPenalty }),
+    ...(presencePenalty != null && { presencePenalty }),
     experimental_transform: smoothStream(SMOOTH_STREAM_CONFIG),
     onChunk: ({ chunk }) => {
       if (chunk.type === "text-delta" && typeof chunk.text === "string") {
