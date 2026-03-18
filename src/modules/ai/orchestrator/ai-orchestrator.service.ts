@@ -5,10 +5,12 @@
 
 import { createError } from '../../../utils/index.js';
 import { characterRepository } from '../../character/character.repository.js';
+import { realmRepository } from '../../realm/realm.repository.js';
 import { preprocessMessage } from '../preprocessor/preprocessor.service.js';
 import { buildCharacterContext } from '../character/character-context.service.js';
 import { planResponse } from '../prompt-planner/prompt-planner.service.js';
 import { buildFinalMessages } from '../prompt-builder/final-prompt.builder.js';
+import { buildRealmSystemPrompt } from '../realm/realm-prompt.builder.js';
 import type {
   AIOrchestratorInput,
   AIOrchestratorResult,
@@ -21,7 +23,7 @@ const DEFAULT_MAX_TOKENS = 1024;
 export async function runAIOrchestrator(
   input: AIOrchestratorInput
 ): Promise<AIOrchestratorResult> {
-  const { userMessage, characterId, history, memoryContext } = input;
+  const { userMessage, characterId, realmId, history, memoryContext } = input;
 
   const preprocess = await preprocessMessage(userMessage);
 
@@ -29,6 +31,10 @@ export async function runAIOrchestrator(
     throw createError.badRequest(
       'Your message could not be processed. Please rephrase and try again.'
     );
+  }
+
+  if (realmId) {
+    return buildRealmChatResult(input, preprocess);
   }
 
   if (!characterId) {
@@ -79,6 +85,52 @@ type CharacterWithRelations = Awaited<ReturnType<typeof characterRepository.find
   persona?: { id: string; name: string; description?: string | null } | null;
   lorebook?: { id: string; name: string; entries?: Array<{ keywords: string[]; context: string; isEnabled: boolean }> } | null;
 };
+
+async function buildRealmChatResult(
+  input: AIOrchestratorInput,
+  preprocess: Awaited<ReturnType<typeof preprocessMessage>>
+): Promise<AIOrchestratorResult> {
+  const { realmId, history, userMessage, userAttachments, memoryContext } = input;
+
+  if (!realmId) throw createError.badRequest('Realm ID is required');
+
+  const realm = await realmRepository.findRealmById(realmId);
+  if (!realm) {
+    throw createError.notFound('Realm not found');
+  }
+
+  const realmWithChars = realm as unknown as { characters?: Array<{ name: string }> };
+  const characterNames = realmWithChars.characters?.map((c) => c.name) ?? [];
+  const theme = Array.isArray(realm.tags) && realm.tags.length > 0
+    ? (realm.tags as string[]).map((t) => (t.startsWith('#') ? t : `#${t}`)).join(', ')
+    : '#general';
+
+  const systemPrompt = buildRealmSystemPrompt({
+    realmName: realm.name,
+    theme,
+    characterNames: characterNames.length > 0 ? characterNames : ['Character'],
+  });
+
+  const plan = planResponse(preprocess.emotion, preprocess.intent);
+
+  const messages = buildFinalMessages({
+    systemPrompt,
+    toneInstruction: plan.toneInstruction,
+    memoryPrompt: memoryContext?.systemPrompt,
+    loreContext: undefined,
+    history,
+    userMessage,
+    userAttachments,
+  });
+
+  return {
+    messages,
+    temperature: plan.temperature,
+    maxTokens: plan.maxTokens,
+    preprocess,
+    responsePlan: plan,
+  };
+}
 
 async function buildCharacterChatResult(
   input: AIOrchestratorInput,

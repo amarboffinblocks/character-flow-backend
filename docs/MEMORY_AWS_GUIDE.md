@@ -1,106 +1,98 @@
-# Mem0 + AWS / Self-Hosted Models Guide
+# Mem0 + Custom Hosted Models Guide
 
-This guide explains how to use your **AWS-hosted LLM** and an **embedding model** with the Mem0 memory service, so memories are stored in Qdrant using your own infrastructure.
+This guide explains how to use your **self-hosted LLM** and **embedding model** with the Mem0 memory service, so memories are stored in Qdrant using your own infrastructure.
 
 ---
 
-## 1. Connecting a custom AWS-hosted LLM
+## 1. Environment variables
 
-Mem0 uses an LLM for **fact extraction** when adding memories (e.g. turning “I love pizza” into a structured memory). You can point this to any **OpenAI-compatible chat completions** endpoint (e.g. vLLM, Sagemaker, or a gateway).
-
-### Requirements
-
-- Your endpoint must expose **OpenAI-style** `POST /v1/chat/completions` (same request/response shape as OpenAI).
-- Base URL should be the **prefix** before `/v1` (e.g. `https://your-endpoint.aws.com` if completions are at `https://your-endpoint.aws.com/v1/chat/completions`).
-
-### Configuration
-
-In `.env`:
+All memory configuration lives in your `.env`:
 
 ```env
 MEM0_ENABLED=true
 
-# Your AWS / custom LLM (OpenAI-compatible)
-MEM0_LLM_BASE_URL=https://your-llm-endpoint.aws.com/v1
-MEM0_LLM_MODEL=your-model-id
+# Qdrant vector store
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
 
-# If your endpoint requires an API key
-MEM0_CUSTOM_API_KEY=your-api-key
+# Custom embedding model (OpenAI-compatible endpoint)
+CUSTOM_EMBEDDING_BASE_URL=http://your-embedding-server:8000/v1
+CUSTOM_EMBEDDING_MODEL=your-embedding-model-name
+MEM0_EMBEDDING_DIMS=768
+
+# Custom LLM for memory fact extraction (OpenAI-compatible endpoint)
+CUSTOM_LLM_BASE_URL=http://your-llm-server:8000/v1
+CUSTOM_LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 ```
 
-- **MEM0_LLM_BASE_URL** – Base URL of the API (including `/v1`).
-- **MEM0_LLM_MODEL** – Model name/id your server expects (e.g. `meta-llama/Llama-3.2-3B` for vLLM).
-- **MEM0_CUSTOM_API_KEY** – Optional; use if the endpoint expects an `Authorization: Bearer ...` header.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MEM0_ENABLED` | Yes | Set `true` to enable memory |
+| `QDRANT_HOST` / `QDRANT_PORT` | Yes | Qdrant vector store address |
+| `QDRANT_URL` | Alt | Full URL for Qdrant Cloud (replaces host/port) |
+| `QDRANT_API_KEY` | No | API key for Qdrant Cloud |
+| `CUSTOM_EMBEDDING_BASE_URL` | Yes | Base URL of your embedding server (include `/v1`) |
+| `CUSTOM_EMBEDDING_MODEL` | No | Model name your server expects |
+| `MEM0_EMBEDDING_DIMS` | No | Embedding dimensions (default: 768) |
+| `CUSTOM_LLM_BASE_URL` | Yes | Base URL of your LLM server (include `/v1`) |
+| `CUSTOM_LLM_MODEL` | No | Model name (default: `Qwen/Qwen2.5-7B-Instruct`) |
+| `MEM0_COLLECTION_NAME` | No | Qdrant collection name (default: `youruniverse_memories`) |
+| `MEMORY_SCORE_THRESHOLD` | No | Min relevance score to include a memory (default: 0.3) |
+| `MEMORY_TIME_DECAY_FACTOR` | No | Time decay per hour (default: 0.0005) |
+| `MEMORY_MAX_AGE_DAYS` | No | Max memory age before pruning (default: 30) |
 
-The memory service uses the **OpenAI provider** with `baseURL` so all Mem0 LLM calls go to your endpoint. No Gemini/OpenAI keys are required for the LLM when this is set.
-
----
-
-## 2. Embedding model for AWS (for testing)
-
-For **lightweight, self-hosted embeddings** on AWS, a good choice is:
-
-| Model | Dimensions | Notes |
-|-------|------------|--------|
-| **sentence-transformers/all-MiniLM-L6-v2** | **384** | Small (~22M params, ~88 MB), fast on CPU, good for testing. |
-| **nomic-ai/nomic-embed-text-v1.5** (via Ollama) | 768 | Better quality; run via Ollama on EC2. |
-
-**Recommendation for testing:** use **all-MiniLM-L6-v2** (384 dims): low resource use, easy to run on a single small instance or via Hugging Face Inference Endpoints on AWS.
-
-If you host it yourself (e.g. FastAPI + `sentence-transformers`), expose an **OpenAI-compatible** `POST /v1/embeddings` endpoint so Mem0 can call it. Alternatively, use **Ollama** on EC2 with an embedding model (see below); that works with the current Mem0 setup without an OpenAI-compatible API.
+No Gemini or OpenAI keys are needed for memory.
 
 ---
 
-## 3. Configuring the embedder in Mem0
+## 2. Endpoint requirements
 
-You have two supported options: **Ollama** (recommended for quick testing) or an **OpenAI-compatible** embedding API.
+### Embedding server
 
-### Option A: Ollama embedder (recommended for testing)
+Must expose **OpenAI-style** `POST /v1/embeddings`:
 
-Run [Ollama](https://ollama.com) on an EC2 (or any host) and pull an embedding model. Mem0 talks to it via the **Ollama** provider (no OpenAI-compatible API needed).
+```json
+// Request
+{ "input": ["text to embed"], "model": "your-model" }
 
-1. **On your EC2 (or server):**
-   ```bash
-   curl -fsSL https://ollama.com/install.sh | sh
-   ollama pull nomic-embed-text
-   ```
-2. **In `.env`:**
-   ```env
-   MEM0_ENABLED=true
-   MEM0_OLLAMA_EMBEDDER_URL=http://your-ec2-host:11434
-   MEM0_OLLAMA_EMBEDDER_MODEL=nomic-embed-text:latest
-   MEM0_EMBEDDING_DIMS=768
-   ```
-   Replace `your-ec2-host` with the host/IP (and ensure port 11434 is open).
+// Response
+{ "data": [{ "embedding": [0.1, 0.2, ...], "index": 0 }] }
+```
 
-Mem0 will use this for both **adding** and **searching** memories; vectors are stored in Qdrant with dimension 768.
+### LLM server
 
-### Option B: OpenAI-compatible embedding endpoint
+Must expose **OpenAI-style** `POST /v1/chat/completions`:
 
-If you host an embedding service that exposes **OpenAI-style** `POST /v1/embeddings` (e.g. Hugging Face Inference Endpoints, or your own FastAPI wrapper around `all-MiniLM-L6-v2`):
+```json
+// Request
+{ "model": "Qwen/Qwen2.5-7B-Instruct", "messages": [...] }
 
-1. **In `.env`:**
-   ```env
-   MEM0_ENABLED=true
-   MEM0_EMBEDDER_BASE_URL=https://your-embedding-endpoint.aws.com/v1
-   MEM0_EMBEDDER_MODEL=your-embedding-model-name
-   MEM0_EMBEDDING_DIMS=384
-   ```
-   For **all-MiniLM-L6-v2** use `MEM0_EMBEDDING_DIMS=384`. Use the model name your endpoint expects for `MEM0_EMBEDDER_MODEL`.
+// Response  
+{ "choices": [{ "message": { "content": "..." } }] }
+```
 
-2. If the endpoint requires auth:
-   ```env
-   MEM0_CUSTOM_API_KEY=your-api-key
-   ```
-
-**Note:** The Mem0 Node SDK in this project may not pass `baseURL` through to the OpenAI embedder in all versions. If embeddings still hit OpenAI’s API, try upgrading `mem0ai` or use **Option A (Ollama)** for a reliable self-hosted path.
+Both endpoints use `apiKey: "dummy-key"` since your servers don't require auth.
 
 ---
 
-## 4. Summary: minimal AWS testing setup
+## 3. Memory architecture
 
-- **Qdrant:** Already configured (local Docker or Qdrant Cloud).
-- **LLM:** Set `MEM0_LLM_BASE_URL` + `MEM0_LLM_MODEL` (and optionally `MEM0_CUSTOM_API_KEY`).
-- **Embeddings:** Set `MEM0_OLLAMA_EMBEDDER_URL` (and optionally `MEM0_OLLAMA_EMBEDDER_MODEL`), with `MEM0_EMBEDDING_DIMS=768` for `nomic-embed-text`.
+The system stores memories with metadata (`chatId`, `characterId`, `timestamp`) and retrieves across three scopes:
 
-No Gemini or OpenAI keys are required when using your own LLM and Ollama embedder. For an OpenAI-compatible embedding API, use `MEM0_EMBEDDER_BASE_URL` and matching `MEM0_EMBEDDING_DIMS` (e.g. 384 for all-MiniLM-L6-v2).
+| Scope | Filter | Use case |
+|-------|--------|----------|
+| **chat** | `chatId` match | Current conversation context |
+| **character** | `characterId` match | Interaction history with a specific character |
+| **global** | userId only | User-wide preferences and background |
+
+Retrieval fans out across all applicable scopes in parallel, deduplicates, applies time-decay scoring, and builds a categorised system prompt.
+
+---
+
+## 4. Memory management features
+
+- **Time-decay scoring** — older memories rank lower automatically
+- **Score threshold** — low-relevance memories are filtered out
+- **Pruning** — `pruneMemories(userId)` removes stale/low-score entries
+- **Stats** — `getMemoryStats(userId)` returns per-scope memory counts
+- **Delete** — `deleteMemory(memoryId)` removes a specific memory

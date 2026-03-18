@@ -97,8 +97,11 @@ export const createApp = async (): Promise<express.Application> => {
   // Compression middleware - skip SSE/streaming responses
   app.use(compression({
     filter: (req, res) => {
-      // Don't compress chat message stream (POST to /chats/:id/messages returns SSE)
-      const isChatStream = req.method === 'POST' && /\/api\/v1\/chats\/[^/]+\/messages$/.test(req.path);
+      // Don't compress chat message stream (POST to /chats/:id/messages or /realms/:id/chats/:id/messages returns SSE)
+      const isChatStream =
+        req.method === 'POST' &&
+        (/\/api\/v1\/chats\/[^/]+\/messages$/.test(req.path) ||
+          /\/api\/v1\/realms\/[^/]+\/chats\/[^/]+\/messages$/.test(req.path));
       if (isChatStream) {
         return false;
       }

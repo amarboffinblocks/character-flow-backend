@@ -64,6 +64,10 @@ const envSchema = z.object({
     AI_SAFETY_BLOCKED_WORDS: z.string().optional(),
     AI_GUARDRAIL_BLOCKED_PHRASES: z.string().optional(),
 
+    // AI provider keys (used by chat provider.ts)
+    OPENAI_API_KEY: z.string().optional(),
+    GEMINI_API_KEY: z.string().optional(),
+
     // Mem0 Memory (optional - graceful degradation when not configured)
     MEM0_ENABLED: z.string().optional().transform((v) => v === 'true' || v === '1'),
     QDRANT_HOST: z.string().optional(),
@@ -72,8 +76,17 @@ const envSchema = z.object({
     QDRANT_API_KEY: z.string().optional(),
     MEM0_COLLECTION_NAME: z.string().optional(),
     MEM0_EMBEDDING_DIMS: z.string().optional(),
-    OPENAI_API_KEY: z.string().optional(),
-    GEMINI_API_KEY: z.string().optional(),
+
+    // Custom hosted models for memory (required when MEM0_ENABLED=true)
+    CUSTOM_EMBEDDING_BASE_URL: z.string().optional(),
+    CUSTOM_EMBEDDING_MODEL: z.string().optional(),
+    CUSTOM_LLM_BASE_URL: z.string().optional(),
+    CUSTOM_LLM_MODEL: z.string().optional(),
+
+    // Memory management tuning
+    MEMORY_SCORE_THRESHOLD: z.string().optional(),
+    MEMORY_TIME_DECAY_FACTOR: z.string().optional(),
+    MEMORY_MAX_AGE_DAYS: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -176,8 +189,13 @@ export const config = {
         },
         collectionName: env.MEM0_COLLECTION_NAME || 'youruniverse_memories',
         embeddingDims: env.MEM0_EMBEDDING_DIMS ? parseInt(env.MEM0_EMBEDDING_DIMS, 10) : 768,
-        geminiApiKey: env.GEMINI_API_KEY,
-        openaiApiKey: env.OPENAI_API_KEY,
+        embeddingBaseUrl: env.CUSTOM_EMBEDDING_BASE_URL,
+        embeddingModel: env.CUSTOM_EMBEDDING_MODEL,
+        llmBaseUrl: env.CUSTOM_LLM_BASE_URL,
+        llmModel: env.CUSTOM_LLM_MODEL,
+        scoreThreshold: env.MEMORY_SCORE_THRESHOLD ? parseFloat(env.MEMORY_SCORE_THRESHOLD) : 0.3,
+        timeDecayFactor: env.MEMORY_TIME_DECAY_FACTOR ? parseFloat(env.MEMORY_TIME_DECAY_FACTOR) : 0.0005,
+        maxAgeDays: env.MEMORY_MAX_AGE_DAYS ? parseInt(env.MEMORY_MAX_AGE_DAYS, 10) : 30,
     },
 } as const;
 

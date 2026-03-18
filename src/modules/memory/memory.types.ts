@@ -1,30 +1,45 @@
 /**
- * Memory module types
- * Entity partitioning: userId + chatId for multi-tenant isolation
+ * Advanced memory module types.
+ * Supports multi-scope memory: global (user-wide), character-specific, chat-specific.
  */
+
+export type MemoryScope = 'global' | 'character' | 'chat';
 
 export interface MemoryAddInput {
   userId: string;
   chatId: string;
+  characterId?: string | null;
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
 }
 
 export interface MemorySearchInput {
   userId: string;
   chatId: string;
+  characterId?: string | null;
   query: string;
   limit?: number;
+  scopes?: MemoryScope[];
 }
 
 export interface MemorySearchResult {
   memory: string;
   score: number;
+  scope: MemoryScope;
   metadata?: Record<string, unknown>;
 }
 
 export interface MemoryContext {
-  /** Formatted string for system prompt injection */
   systemPrompt: string;
-  /** Raw memories for logging/debugging */
   memories: MemorySearchResult[];
+  stats: {
+    totalRetrieved: number;
+    byScope: Record<MemoryScope, number>;
+  };
+}
+
+export interface MemoryStats {
+  totalMemories: number;
+  globalMemories: number;
+  characterMemories: number;
+  chatMemories: number;
 }

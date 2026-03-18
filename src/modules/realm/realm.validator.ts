@@ -50,11 +50,12 @@ export const createRealmSchema = z.object({
 export const updateRealmSchema = z.object({
     name: nameSchema.optional(),
     description: descriptionSchema,
-    tags: tagsSchema.optional(),
+    tags: z.array(z.string().min(1).max(50)).max(20, 'Maximum 20 tags allowed').optional(),
     rating: ratingSchema.optional(),
     visibility: visibilitySchema.optional(),
     avatar: avatarSchema,
     isFavourite: z.boolean().optional(),
+    characterIds: z.array(uuidSchema).optional(),
 });
 
 export const realmQuerySchema = z.object({

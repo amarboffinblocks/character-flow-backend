@@ -104,6 +104,14 @@ async function processRealmUpdate(
         }
     }
 
+    if (typeof bodyData.characterIds === 'string' && bodyData.characterIds.trim()) {
+        try {
+            bodyData.characterIds = JSON.parse(bodyData.characterIds);
+        } catch {
+            bodyData.characterIds = bodyData.characterIds.split(',').map((id: string) => id.trim()).filter(Boolean);
+        }
+    }
+
     if (bodyData.isFavourite !== undefined && typeof bodyData.isFavourite === 'string') {
         bodyData.isFavourite = bodyData.isFavourite === 'true';
     }

@@ -287,15 +287,17 @@ export const chatService = {
       .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
       .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
 
-    // Retrieve relevant memories from Mem0 (scoped by userId + chatId)
+    const characterId = (chat as { characterId?: string | null })?.characterId ?? null;
+    const realmId = (chat as { realmId?: string | null })?.realmId ?? null;
+
+    // Retrieve relevant memories (multi-scope: chat + character + global)
     const memoryContext = await searchMemories({
       userId,
       chatId,
+      characterId,
       query: input.content?.trim() || persistedContent,
-      limit: 5,
+      limit: 10,
     });
-
-    const characterId = (chat as { characterId?: string | null })?.characterId ?? null;
 
     const orchestratorResult = await runAIOrchestrator({
       chatId,
@@ -303,6 +305,7 @@ export const chatService = {
       userMessage: input.content?.trim() ?? '',
       userAttachments: input.attachments,
       characterId,
+      realmId,
       history: contextMessages,
       memoryContext: memoryContext.systemPrompt
         ? { systemPrompt: memoryContext.systemPrompt, memories: memoryContext.memories }
@@ -343,10 +346,10 @@ export const chatService = {
           role: 'assistant',
           content: processed,
         });
-        // Persist to Mem0 for future retrieval
         await addMemories({
           userId,
           chatId,
+          characterId,
           messages: [
             { role: 'user', content: persistedContent },
             { role: 'assistant', content: processed },
@@ -425,14 +428,16 @@ export const chatService = {
       .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
       .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
 
+    const characterId = (chat as { characterId?: string | null })?.characterId ?? null;
+    const realmId = (chat as { realmId?: string | null })?.realmId ?? null;
+
     const memoryContext = await searchMemories({
       userId,
       chatId,
+      characterId,
       query: userMsg.content ?? '',
-      limit: 5,
+      limit: 10,
     });
-
-    const characterId = (chat as { characterId?: string | null })?.characterId ?? null;
 
     const orchestratorResult = await runAIOrchestrator({
       chatId,
@@ -440,6 +445,7 @@ export const chatService = {
       userMessage: userMsg.content ?? '',
       userAttachments: [],
       characterId,
+      realmId,
       history: contextMessages,
       memoryContext: memoryContext.systemPrompt
         ? { systemPrompt: memoryContext.systemPrompt, memories: memoryContext.memories }
@@ -482,6 +488,7 @@ export const chatService = {
         await addMemories({
           userId,
           chatId,
+          characterId,
           messages: [
             { role: 'user', content: userMsg.content ?? '' },
             { role: 'assistant', content: processed },

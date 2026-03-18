@@ -121,6 +121,7 @@ export interface AIOrchestratorInput {
   userMessage: string;
   userAttachments?: UserAttachment[];
   characterId: string | null;
+  realmId: string | null;
   history: ChatMessage[];
   memoryContext?: { systemPrompt: string; memories?: unknown[] };
 }
