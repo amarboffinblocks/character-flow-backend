@@ -32,20 +32,47 @@ export const createApp = async (): Promise<express.Application> => {
     contentSecurityPolicy: config.app.isProd,
   }));
 
-  // CORS — use CORS_ORIGIN from config (comma-separated in production)
-  const allowedOrigins = config.cors.allowedOrigins;
-  const allowAllOrigins = allowedOrigins.includes('*');
+  // CORS configuration - supports ngrok, multiple origins, and allow-all
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (same-origin, server-to-server, or proxy may strip it)
+      // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) {
         return callback(null, true);
       }
-      if (allowAllOrigins || allowedOrigins.includes(origin)) {
+
+      const allowedOrigin = config.cors.origin;
+
+      // Allow all origins when CORS_ORIGIN is *
+      if (allowedOrigin === '*') {
+        // Reflect request origin (required when credentials: true)
         return callback(null, origin);
       }
-      logger.warn({ origin, allowedOrigins }, 'CORS: origin not allowed');
-      callback(new Error('Not allowed by CORS'), false);
+
+      // Support comma-separated origins
+      const allowedOrigins = allowedOrigin.includes(',')
+        ? allowedOrigin.split(',').map(o => o.trim())
+        : [allowedOrigin];
+
+      // Check exact match
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // In development, allow ngrok URLs (https://*.ngrok.io, https://*.ngrok-free.app)
+      if (config.app.isDev && (
+        origin.includes('.ngrok.io') ||
+        origin.includes('.ngrok-free.app') ||
+        origin.includes('.ngrok.app') ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('https://localhost:')
+      )) {
+        logger.info({ origin }, 'Allowing ngrok/localhost origin in development');
+        return callback(null, true);
+      }
+
+      // Reject origin
+      logger.warn({ origin, allowedOrigins }, 'CORS blocked request');
+      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
     },
     credentials: config.cors.credentials,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -58,9 +85,9 @@ export const createApp = async (): Promise<express.Application> => {
       'Origin',
     ],
     exposedHeaders: ['Content-Type', 'Authorization', 'X-User-Message-Id'],
-    maxAge: 86400,
-    optionsSuccessStatus: 204,
-    preflightContinue: false,
+    maxAge: 86400, // Cache preflight requests for 24 hours (in seconds)
+    optionsSuccessStatus: 204, // Return 204 for OPTIONS requests
+    preflightContinue: false, // End preflight requests immediately
   }));
 
   // ============================================
@@ -70,11 +97,8 @@ export const createApp = async (): Promise<express.Application> => {
   // Compression middleware - skip SSE/streaming responses
   app.use(compression({
     filter: (req, res) => {
-      // Don't compress chat message stream (POST to /chats/:id/messages or /realms/:id/chats/:id/messages returns SSE)
-      const isChatStream =
-        req.method === 'POST' &&
-        (/\/api\/v1\/chats\/[^/]+\/messages$/.test(req.path) ||
-          /\/api\/v1\/realms\/[^/]+\/chats\/[^/]+\/messages$/.test(req.path));
+      // Don't compress chat message stream (POST to /chats/:id/messages returns SSE)
+      const isChatStream = req.method === 'POST' && /\/api\/v1\/chats\/[^/]+\/messages$/.test(req.path);
       if (isChatStream) {
         return false;
       }
@@ -161,7 +185,6 @@ export const createApp = async (): Promise<express.Application> => {
       logger.error({ stack: error.stack }, 'Swagger setup error details');
     }
   }
-
 
   // ============================================
   // API Routes (File-Based Routing)
