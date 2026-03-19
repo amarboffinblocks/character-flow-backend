@@ -68,6 +68,7 @@ export const createApp = async (): Promise<express.Application> => {
       )) {
         logger.info({ origin }, 'Allowing ngrok/localhost origin in development');
         return callback(null, true);
+
       }
 
       // Reject origin
