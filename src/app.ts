@@ -34,61 +34,22 @@ export const createApp = async (): Promise<express.Application> => {
 
   // CORS configuration - supports ngrok, multiple origins, and allow-all
   app.use(cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) {
-        return callback(null, true);
-      }
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
 
-      const allowedOrigin = config.cors.origin;
+    const allowedOrigins = config.cors.origin
+      .split(',')
+      .map(o => o.trim());
 
-      // Allow all origins when CORS_ORIGIN is *
-      if (allowedOrigin === '*') {
-        // Reflect request origin (required when credentials: true)
-        return callback(null, origin);
-      }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-      // Support comma-separated origins
-      const allowedOrigins = allowedOrigin.includes(',')
-        ? allowedOrigin.split(',').map(o => o.trim())
-        : [allowedOrigin];
-
-      // Check exact match
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // In development, allow ngrok URLs (https://*.ngrok.io, https://*.ngrok-free.app)
-      if (config.app.isDev && (
-        origin.includes('.ngrok.io') ||
-        origin.includes('.ngrok-free.app') ||
-        origin.includes('.ngrok.app') ||
-        origin.startsWith('http://localhost:') ||
-        origin.startsWith('https://localhost:')
-      )) {
-        logger.info({ origin }, 'Allowing ngrok/localhost origin in development');
-        return callback(null, true);
-      }
-
-      // Reject origin
-      logger.warn({ origin, allowedOrigins }, 'CORS blocked request');
-      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
-    },
-    credentials: config.cors.credentials,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'Idempotency-Key',
-      'X-Requested-With',
-      'Accept',
-      'Origin',
-    ],
-    exposedHeaders: ['Content-Type', 'Authorization', 'X-User-Message-Id'],
-    maxAge: 86400, // Cache preflight requests for 24 hours (in seconds)
-    optionsSuccessStatus: 204, // Return 204 for OPTIONS requests
-    preflightContinue: false, // End preflight requests immediately
-  }));
+    logger.warn({ origin, allowedOrigins }, 'CORS blocked request');
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+}));
 
   // ============================================
   // General Middleware
