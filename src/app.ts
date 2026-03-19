@@ -32,10 +32,22 @@ export const createApp = async (): Promise<express.Application> => {
     contentSecurityPolicy: config.app.isProd,
   }));
 
-  // CORS — allow all origins (reflect requesting origin for credentials support)
+  // CORS — use CORS_ORIGIN from config (comma-separated in production)
+  const allowedOrigins = config.cors.allowedOrigins;
+  const allowAllOrigins = allowedOrigins.includes('*');
   app.use(cors({
-    origin: (origin, callback) => callback(null, origin || true),
-    credentials: true,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (same-origin, server-to-server, or proxy may strip it)
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (allowAllOrigins || allowedOrigins.includes(origin)) {
+        return callback(null, origin);
+      }
+      logger.warn({ origin, allowedOrigins }, 'CORS: origin not allowed');
+      callback(new Error('Not allowed by CORS'), false);
+    },
+    credentials: config.cors.credentials,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',

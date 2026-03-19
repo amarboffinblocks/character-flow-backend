@@ -39,8 +39,12 @@ const envSchema = z.object({
     RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
     RATE_LIMIT_AUTH_MAX_REQUESTS: z.string().default('5'),
 
-    // CORS
-    CORS_ORIGIN: z.string().default('http://localhost:3000'),
+    // CORS (comma-separated for multiple origins, or * for all)
+    CORS_ORIGIN: z.string().default('http://localhost:3000').transform((v) => {
+        const trimmed = v.trim();
+        if (trimmed === '*') return ['*'];
+        return trimmed.split(',').map((o) => o.trim()).filter(Boolean);
+    }),
     CORS_CREDENTIALS: z.string().default('true'),
 
     // Python Microservice
@@ -148,7 +152,8 @@ export const config = {
     },
 
     cors: {
-        origin: env.CORS_ORIGIN,
+        /** Array of allowed origins, or ['*'] for allow-all (cannot use * with credentials) */
+        allowedOrigins: env.CORS_ORIGIN,
         credentials: env.CORS_CREDENTIALS === 'true',
     },
 
