@@ -32,33 +32,33 @@ export const createApp = async (): Promise<express.Application> => {
     contentSecurityPolicy: config.app.isProd,
   }));
 
-  // CORS configuration - supports ngrok, multiple origins, and allow-all
+  // CORS configuration - supports wildcard subdomains, multiple origins, and allow-all
+  const parsedCorsOrigins = (() => {
+    const raw = config.cors.origin;
+    if (raw === '*') return '*' as const;
+    return raw.split(',').map(o => o.trim()).filter(Boolean);
+  })();
+
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) {
-        return callback(null, true);
-      }
+      // Allow requests with no origin (mobile apps, Postman, server-to-server, etc.)
+      if (!origin) return callback(null, true);
 
-      const allowedOrigin = config.cors.origin;
+      // Allow all origins (reflect request origin for credentials: true compatibility)
+      if (parsedCorsOrigins === '*') return callback(null, origin);
 
-      // Allow all origins when CORS_ORIGIN is *
-      if (allowedOrigin === '*') {
-        // Reflect request origin (required when credentials: true)
-        return callback(null, origin);
-      }
+      // Exact match
+      if (parsedCorsOrigins.includes(origin)) return callback(null, true);
 
-      // Support comma-separated origins
-      const allowedOrigins = allowedOrigin.includes(',')
-        ? allowedOrigin.split(',').map(o => o.trim())
-        : [allowedOrigin];
+      // Wildcard subdomain match (e.g. https://*.example.com)
+      const wildcardMatch = parsedCorsOrigins.some((allowed) => {
+        if (!allowed.includes('*')) return false;
+        const pattern = allowed.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^.]+');
+        return new RegExp(`^${pattern}$`).test(origin);
+      });
+      if (wildcardMatch) return callback(null, true);
 
-      // Check exact match
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // In development, allow ngrok URLs (https://*.ngrok.io, https://*.ngrok-free.app)
+      // In development, allow ngrok / localhost URLs
       if (config.app.isDev && (
         origin.includes('.ngrok.io') ||
         origin.includes('.ngrok-free.app') ||
@@ -66,14 +66,12 @@ export const createApp = async (): Promise<express.Application> => {
         origin.startsWith('http://localhost:') ||
         origin.startsWith('https://localhost:')
       )) {
-        logger.info({ origin }, 'Allowing ngrok/localhost origin in development');
         return callback(null, true);
-
       }
 
-      // Reject origin
-      logger.warn({ origin, allowedOrigins }, 'CORS blocked request');
-      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      // Reject — use callback(null, false) instead of throwing so the response stays clean
+      logger.warn({ origin, allowed: parsedCorsOrigins }, 'CORS origin rejected');
+      callback(null, false);
     },
     credentials: config.cors.credentials,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -86,9 +84,9 @@ export const createApp = async (): Promise<express.Application> => {
       'Origin',
     ],
     exposedHeaders: ['Content-Type', 'Authorization', 'X-User-Message-Id'],
-    maxAge: 86400, // Cache preflight requests for 24 hours (in seconds)
-    optionsSuccessStatus: 204, // Return 204 for OPTIONS requests
-    preflightContinue: false, // End preflight requests immediately
+    maxAge: 86400,
+    optionsSuccessStatus: 204,
+    preflightContinue: false,
   }));
 
   // ============================================
