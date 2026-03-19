@@ -24,14 +24,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export const createApp = async (): Promise<express.Application> => {
   const app = express();
 
-  // ============================================
-  // Security Middleware
-  // ============================================
-
-  app.use(helmet({
-    contentSecurityPolicy: config.app.isProd,
-  }));
-
   // CORS configuration - supports ngrok, multiple origins, and allow-all
   app.use(cors({
   origin: (origin, callback) => {
@@ -41,7 +33,9 @@ export const createApp = async (): Promise<express.Application> => {
       .split(',')
       .map(o => o.trim());
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || ||
+      origin.endsWith('.vercel.app')
+       ) {
       return callback(null, true);
     }
 
@@ -50,6 +44,16 @@ export const createApp = async (): Promise<express.Application> => {
   },
   credentials: true,
 }));
+  
+app.options('*', cors());
+
+  // ============================================
+  // Security Middleware
+  // ============================================
+
+  app.use(helmet({
+    contentSecurityPolicy: config.app.isProd,
+  }));
 
   // ============================================
   // General Middleware
