@@ -68,6 +68,7 @@ const envSchema = z.object({
     AI_SAFETY_BLOCKED_WORDS: z.string().optional(),
     AI_GUARDRAIL_BLOCKED_PHRASES: z.string().optional(),
 
+
     // AI provider keys (used by chat provider.ts)
     OPENAI_API_KEY: z.string().optional(),
     GEMINI_API_KEY: z.string().optional(),
