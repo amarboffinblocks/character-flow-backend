@@ -84,4 +84,14 @@ export const realmChatService = {
     await this.getRealmChat(realmId, chatId, userId);
     return chatService.getMessagesByChat(chatId, userId, params ?? {});
   },
+
+  async deleteRealmChatMessage(
+    realmId: string,
+    chatId: string,
+    userId: string,
+    messageId: string
+  ) {
+    await ensureRealmOwnership(realmId, userId);
+    return chatService.deleteMessageById(chatId, userId, messageId);
+  },
 };

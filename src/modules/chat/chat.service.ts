@@ -142,6 +142,17 @@ export const chatService = {
     return { message: 'Chat deleted successfully' };
   },
 
+  async deleteMessageById(chatId: string, userId: string, messageId: string): Promise<MessageResponse> {
+    const chat = await chatRepository.findChatByIdAndUser(chatId, userId);
+    if (!chat) throw createError.notFound('Chat not found');
+
+    const message = await chatRepository.findMessageById(messageId, chatId);
+    if (!message) throw createError.notFound('Message not found');
+
+    await chatRepository.deleteMessage(messageId);
+    return { message: 'Message deleted successfully' };
+  },
+
   /**
    * Validate that the default model is available for chat
    * This should be called before sending messages to ensure a default model is configured
