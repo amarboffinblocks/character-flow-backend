@@ -66,18 +66,19 @@ export const createMessageSchema = z
   .object({
     content: z.string().max(10000, 'Message content is too long').optional(),
     role: z.enum(['user', 'assistant', 'system']).optional().default('user'),
-    trigger: z.enum(['regenerate']).optional(),
+    trigger: z.enum(['regenerate', 'edit']).optional(),
     messageId: z.string().uuid().optional(),
     attachments: z.array(attachmentSchema).optional().default([]),
   })
   .refine(
     (data) => {
-      if (data.trigger === 'regenerate') return !!data.messageId;
+      if (data.trigger === 'regenerate') return true;
+      if (data.trigger === 'edit') return !!data.messageId && !!data.content?.trim();
       const hasContent = !!data.content && data.content.length > 0;
       const hasAttachments = (data.attachments?.length ?? 0) > 0;
       return hasContent || hasAttachments;
     },
-    { message: 'Either content, attachments, or trigger+messageId (for regenerate) is required' }
+    { message: 'Either content, attachments, or trigger+messageId (for regenerate/edit) is required' }
   );
 
 export const messageQuerySchema = z.object({

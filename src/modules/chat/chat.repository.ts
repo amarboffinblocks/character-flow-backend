@@ -243,7 +243,23 @@ export const chatRepository = {
     return prisma.message.findFirst({ where });
   },
 
+  async findLastAssistantMessage(chatId: string) {
+    return prisma.message.findFirst({
+      where: { chatId, role: 'assistant' },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
   async deleteMessage(id: string) {
     await prisma.message.delete({ where: { id } });
+  },
+
+  async deleteMessagesFromTimestamp(chatId: string, fromCreatedAt: Date) {
+    await prisma.message.deleteMany({
+      where: {
+        chatId,
+        createdAt: { gte: fromCreatedAt },
+      },
+    });
   },
 };

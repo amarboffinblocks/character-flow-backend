@@ -65,7 +65,7 @@ export const realmChatService = {
     realmId: string,
     chatId: string,
     userId: string,
-    input: CreateMessageInput & { trigger?: 'regenerate'; messageId?: string }
+    input: CreateMessageInput & { trigger?: 'regenerate' | 'edit'; messageId?: string }
   ): Promise<SendMessageStreamResponse> {
     await ensureRealmOwnership(realmId, userId);
     const chat = await chatRepository.findChatByIdAndUser(chatId, userId);

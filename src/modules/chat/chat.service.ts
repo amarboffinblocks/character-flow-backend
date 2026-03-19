@@ -238,7 +238,7 @@ export const chatService = {
   async sendMessage(
     chatId: string,
     userId: string,
-    input: CreateMessageInput & { trigger?: 'regenerate'; messageId?: string }
+    input: CreateMessageInput & { trigger?: 'regenerate' | 'edit'; messageId?: string }
   ): Promise<SendMessageStreamResponse> {
     const { chat, model } = await this.getModelForChat(chatId, userId);
     const provider = mapProviderToModelProvider(model.provider);
@@ -246,8 +246,22 @@ export const chatService = {
     let userMessage: SendMessageStreamResponse['userMessage'];
     let contextMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
 
-    if (input.trigger === 'regenerate' && input.messageId) {
-      return this.regenerateAssistantMessage(chatId, userId, input.messageId, {
+    if (input.trigger === 'regenerate') {
+      let assistantMessageId = input.messageId;
+      if (!assistantMessageId) {
+        const lastAssistant = await chatRepository.findLastAssistantMessage(chatId);
+        if (!lastAssistant) throw createError.notFound('No assistant message found to regenerate');
+        assistantMessageId = lastAssistant.id;
+      }
+      return this.regenerateAssistantMessage(chatId, userId, assistantMessageId, {
+        chat,
+        model,
+        provider,
+      });
+    }
+
+    if (input.trigger === 'edit' && input.messageId) {
+      return this.editUserMessage(chatId, userId, input.messageId, input.content?.trim() ?? '', {
         chat,
         model,
         provider,
@@ -519,6 +533,147 @@ export const chatService = {
       metadata: userMsg.metadata ?? null,
       createdAt: userMsg.createdAt,
     };
+
+    return {
+      userMessage,
+      streamResult: streamResult as SendMessageStreamResponse['streamResult'],
+    };
+  },
+
+  // ============================================
+  // Edit User Message
+  // ============================================
+
+  async editUserMessage(
+    chatId: string,
+    userId: string,
+    userMessageId: string,
+    newContent: string,
+    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null; metadata?: unknown }; provider: ReturnType<typeof mapProviderToModelProvider> }
+  ): Promise<SendMessageStreamResponse> {
+    const { chat, model, provider } = ctx;
+
+    if (!newContent) {
+      throw createError.badRequest('New message content is required');
+    }
+
+    const userMsg = await chatRepository.findMessageById(userMessageId);
+    if (!userMsg) {
+      throw createError.notFound('Message not found');
+    }
+    if (userMsg.chatId !== chatId) {
+      throw createError.notFound('Message not found');
+    }
+    if (userMsg.role !== 'user') {
+      throw createError.badRequest('Can only edit user messages');
+    }
+
+    await chatRepository.deleteMessagesFromTimestamp(chatId, userMsg.createdAt);
+
+    const created = await chatRepository.createMessage({
+      chatId,
+      role: 'user',
+      content: newContent,
+    });
+
+    const userMessage = {
+      id: created.id,
+      chatId: created.chatId,
+      role: created.role,
+      content: created.content,
+      tokensUsed: created.tokensUsed ?? null,
+      metadata: created.metadata ?? null,
+      createdAt: created.createdAt,
+    };
+
+    const { messages: recentMessages } = await chatRepository.findMessagesByChat(chatId, {
+      limit: MAX_HISTORY_MESSAGES,
+      sortOrder: 'desc',
+    });
+    const historyMessages = [...recentMessages].reverse();
+    const contextMessages = historyMessages
+      .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
+      .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+
+    const characterId = (chat as { characterId?: string | null })?.characterId ?? null;
+    const realmId = (chat as { realmId?: string | null })?.realmId ?? null;
+
+    const memoryContext = await searchMemories({
+      userId,
+      chatId,
+      characterId,
+      query: newContent,
+      limit: 10,
+    });
+
+    const orchestratorResult = await runAIOrchestrator({
+      chatId,
+      userId,
+      userMessage: newContent,
+      userAttachments: [],
+      characterId,
+      realmId,
+      history: contextMessages,
+      memoryContext: memoryContext.systemPrompt
+        ? { systemPrompt: memoryContext.systemPrompt, memories: memoryContext.memories }
+        : undefined,
+    });
+
+    const messages = toModelMessages(orchestratorResult.messages);
+    const modelConfig = parseModelConfig(model.metadata);
+    const logContext = { chatId, userId, messageId: userMessage.id };
+
+    logger.info(
+      {
+        ...logContext,
+        provider: model.provider,
+        model: model.modelName,
+        messageCount: messages.length,
+        characterId: characterId ?? undefined,
+      },
+      'Editing user message and regenerating response'
+    );
+
+    const streamResult = streamLLM({
+      provider,
+      model: model.modelName ?? undefined,
+      messages,
+      temperature: modelConfig.temperature,
+      maxTokens: modelConfig.maxTokens,
+      topP: modelConfig.topP,
+      frequencyPenalty: modelConfig.frequencyPenalty,
+      presencePenalty: modelConfig.presencePenalty,
+      logContext,
+
+      onFinish: async ({ text }) => {
+        const processed = postprocessResponse(text);
+        await chatRepository.createMessage({
+          chatId,
+          role: 'assistant',
+          content: processed,
+        });
+        await addMemories({
+          userId,
+          chatId,
+          characterId,
+          messages: [
+            { role: 'user', content: newContent },
+            { role: 'assistant', content: processed },
+          ],
+        });
+      },
+
+      onError: () => {},
+
+      onPartialSave: async ({ partialText }) => {
+        const processed = postprocessResponse(partialText.trim() || '(Response was interrupted)');
+        await chatRepository.createMessage({
+          chatId,
+          role: 'assistant',
+          content: processed,
+        });
+      },
+    });
 
     return {
       userMessage,
