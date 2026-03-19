@@ -33,9 +33,7 @@ export const createApp = async (): Promise<express.Application> => {
       .split(',')
       .map(o => o.trim());
 
-    if (allowedOrigins.includes(origin) || ||
-      origin.endsWith('.vercel.app')
-       ) {
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
 
