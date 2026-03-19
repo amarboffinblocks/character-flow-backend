@@ -32,48 +32,10 @@ export const createApp = async (): Promise<express.Application> => {
     contentSecurityPolicy: config.app.isProd,
   }));
 
-  // CORS configuration - supports wildcard subdomains, multiple origins, and allow-all
-  const parsedCorsOrigins = (() => {
-    const raw = config.cors.origin;
-    if (raw === '*') return '*' as const;
-    return raw.split(',').map(o => o.trim()).filter(Boolean);
-  })();
-
+  // CORS — allow all origins (reflect requesting origin for credentials support)
   app.use(cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, server-to-server, etc.)
-      if (!origin) return callback(null, true);
-
-      // Allow all origins (reflect request origin for credentials: true compatibility)
-      if (parsedCorsOrigins === '*') return callback(null, origin);
-
-      // Exact match
-      if (parsedCorsOrigins.includes(origin)) return callback(null, true);
-
-      // Wildcard subdomain match (e.g. https://*.example.com)
-      const wildcardMatch = parsedCorsOrigins.some((allowed) => {
-        if (!allowed.includes('*')) return false;
-        const pattern = allowed.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^.]+');
-        return new RegExp(`^${pattern}$`).test(origin);
-      });
-      if (wildcardMatch) return callback(null, true);
-
-      // In development, allow ngrok / localhost URLs
-      if (config.app.isDev && (
-        origin.includes('.ngrok.io') ||
-        origin.includes('.ngrok-free.app') ||
-        origin.includes('.ngrok.app') ||
-        origin.startsWith('http://localhost:') ||
-        origin.startsWith('https://localhost:')
-      )) {
-        return callback(null, true);
-      }
-
-      // Reject — use callback(null, false) instead of throwing so the response stays clean
-      logger.warn({ origin, allowed: parsedCorsOrigins }, 'CORS origin rejected');
-      callback(null, false);
-    },
-    credentials: config.cors.credentials,
+    origin: (origin, callback) => callback(null, origin || true),
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
