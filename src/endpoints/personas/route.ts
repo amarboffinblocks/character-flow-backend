@@ -17,12 +17,23 @@ export const GET = async (req: Request, res: Response): Promise<void> => {
   // Get current user if authenticated
   const user = (req as AuthenticatedRequest).user;
 
+  if (queryParams.visibility === 'public') {
+    const result = await personaService.listPublicPersonas(queryParams, user?.id);
+    sendSuccess(res, result, 'Public personas retrieved successfully');
+    return;
+  }
+
+  if (queryParams.visibility === 'private') {
+    const currentUser = requireCurrentUser(req);
+    const result = await personaService.listPersonas(currentUser.id, queryParams);
+    sendSuccess(res, result, 'Private personas retrieved successfully');
+    return;
+  }
+
   if (user) {
-    // If authenticated, get user's personas
-    const result = await personaService.listPersonas(user.id, queryParams);
+    const result = await personaService.listAccessiblePersonas(user.id, queryParams);
     sendSuccess(res, result, 'Personas retrieved successfully');
   } else {
-    // If not authenticated, get public personas
     const result = await personaService.listPublicPersonas(queryParams);
     sendSuccess(res, result, 'Public personas retrieved successfully');
   }

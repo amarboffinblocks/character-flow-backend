@@ -27,6 +27,73 @@ import type { Character } from '@prisma/client';
 // ============================================
 
 export const characterService = {
+  withUserState(character: any, state: { isFavourite: boolean; isSaved: boolean }) {
+    return {
+      ...character,
+      isFavourite: state.isFavourite,
+      isSaved: state.isSaved,
+    };
+  },
+
+  async resolveUserState(characterId: string, userId?: string): Promise<{ isFavourite: boolean; isSaved: boolean }> {
+    if (!userId) {
+      return { isFavourite: false, isSaved: false };
+    }
+
+    const [favourite, saved] = await Promise.all([
+      prisma.characterFavorite.findUnique({
+        where: { userId_characterId: { userId, characterId } },
+        select: { userId: true },
+      }),
+      prisma.characterSaved.findUnique({
+        where: { userId_characterId: { userId, characterId } },
+        select: { userId: true },
+      }),
+    ]);
+
+    return {
+      isFavourite: Boolean(favourite),
+      isSaved: Boolean(saved),
+    };
+  },
+
+  async resolveUserStateForList(
+    characterIds: string[],
+    userId?: string
+  ): Promise<Map<string, { isFavourite: boolean; isSaved: boolean }>> {
+    const stateMap = new Map<string, { isFavourite: boolean; isSaved: boolean }>();
+    for (const id of characterIds) {
+      stateMap.set(id, { isFavourite: false, isSaved: false });
+    }
+
+    if (!userId || characterIds.length === 0) {
+      return stateMap;
+    }
+
+    const [favourites, saved] = await Promise.all([
+      prisma.characterFavorite.findMany({
+        where: { userId, characterId: { in: characterIds } },
+        select: { characterId: true },
+      }),
+      prisma.characterSaved.findMany({
+        where: { userId, characterId: { in: characterIds } },
+        select: { characterId: true },
+      }),
+    ]);
+
+    for (const item of favourites) {
+      const prev = stateMap.get(item.characterId) ?? { isFavourite: false, isSaved: false };
+      stateMap.set(item.characterId, { ...prev, isFavourite: true });
+    }
+
+    for (const item of saved) {
+      const prev = stateMap.get(item.characterId) ?? { isFavourite: false, isSaved: false };
+      stateMap.set(item.characterId, { ...prev, isSaved: true });
+    }
+
+    return stateMap;
+  },
+
   // ============================================
   // Create Character
   // ============================================
@@ -142,7 +209,9 @@ export const characterService = {
       throw createError.forbidden('Character is private');
     }
 
-    return { character: await transformEntityImageUrls(character) };
+    const transformed = await transformEntityImageUrls(character);
+    const state = await this.resolveUserState(character.id, userId);
+    return { character: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -161,7 +230,9 @@ export const characterService = {
       throw createError.forbidden('Character is private');
     }
 
-    return { character: await transformEntityImageUrls(character) };
+    const transformed = await transformEntityImageUrls(character);
+    const state = await this.resolveUserState(character.id, userId);
+    return { character: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -175,8 +246,12 @@ export const characterService = {
     const limit = params.limit ?? 20;
     const totalPages = Math.ceil(total / limit);
 
+    const stateMap = await this.resolveUserStateForList(characters.map((character) => character.id), userId);
+
     return {
-      characters: await transformEntitiesImageUrls(characters),
+      characters: (await transformEntitiesImageUrls(characters)).map((character: any) =>
+        this.withUserState(character, stateMap.get(character.id) ?? { isFavourite: false, isSaved: false })
+      ),
       pagination: {
         page,
         limit,
@@ -190,15 +265,45 @@ export const characterService = {
   // Get Public Characters
   // ============================================
 
-  async getPublicCharacters(params: CharacterQueryParams): Promise<CharacterListResponse> {
-    const { characters, total } = await characterRepository.findPublicCharacters(params);
+  async getPublicCharacters(params: CharacterQueryParams, userId?: string): Promise<CharacterListResponse> {
+    const { characters, total } = await characterRepository.findPublicCharacters(params, userId);
 
     const page = params.page ?? 1;
     const limit = params.limit ?? 20;
     const totalPages = Math.ceil(total / limit);
 
+    const stateMap = await this.resolveUserStateForList(characters.map((character) => character.id), userId);
+
     return {
-      characters: await transformEntitiesImageUrls(characters),
+      characters: (await transformEntitiesImageUrls(characters)).map((character: any) =>
+        this.withUserState(character, stateMap.get(character.id) ?? { isFavourite: false, isSaved: false })
+      ),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  },
+
+  // ============================================
+  // Get Accessible Characters (for authenticated users)
+  // ============================================
+
+  async getAccessibleCharacters(userId: string, params: CharacterQueryParams): Promise<CharacterListResponse> {
+    const { characters, total } = await characterRepository.findAccessibleCharacters(userId, params);
+
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 20;
+    const totalPages = Math.ceil(total / limit);
+
+    const stateMap = await this.resolveUserStateForList(characters.map((character) => character.id), userId);
+
+    return {
+      characters: (await transformEntitiesImageUrls(characters)).map((character: any) =>
+        this.withUserState(character, stateMap.get(character.id) ?? { isFavourite: false, isSaved: false })
+      ),
       pagination: {
         page,
         limit,
@@ -372,13 +477,13 @@ export const characterService = {
       ...(input.personaId !== undefined && { personaId: input.personaId }),
       ...(input.lorebookId !== undefined && { lorebookId: input.lorebookId }),
       ...(input.realmId !== undefined && { realmId: input.realmId }),
-      ...(input.isFavourite !== undefined && { isFavourite: input.isFavourite }),
-      ...(input.isSaved !== undefined && { isSaved: input.isSaved }),
     };
 
     const character = await characterRepository.updateCharacter(id, updateData);
 
-    return { character: await transformEntityImageUrls(character) };
+    const transformed = await transformEntityImageUrls(character);
+    const state = await this.resolveUserState(character.id, userId);
+    return { character: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -419,15 +524,14 @@ export const characterService = {
       throw createError.notFound('Character not found');
     }
 
-    if (character.userId !== userId) {
+    if (character.visibility === 'private' && character.userId !== userId) {
       throw createError.forbidden('You do not have permission to modify this character');
     }
 
-    const updatedCharacter = await characterRepository.updateCharacter(id, {
-      isFavourite: !character.isFavourite,
-    });
-
-    return { character: await transformEntityImageUrls(updatedCharacter) };
+    const updatedCharacter = await characterRepository.toggleFavouriteForUser(id, userId);
+    const transformed = await transformEntityImageUrls(updatedCharacter);
+    const state = await this.resolveUserState(updatedCharacter.id, userId);
+    return { character: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -441,15 +545,14 @@ export const characterService = {
       throw createError.notFound('Character not found');
     }
 
-    if (character.userId !== userId) {
+    if (character.visibility === 'private' && character.userId !== userId) {
       throw createError.forbidden('You do not have permission to modify this character');
     }
 
-    const updatedCharacter = await characterRepository.updateCharacter(id, {
-      isSaved: !character.isSaved,
-    });
-
-    return { character: await transformEntityImageUrls(updatedCharacter) };
+    const updatedCharacter = await characterRepository.toggleSavedForUser(id, userId);
+    const transformed = await transformEntityImageUrls(updatedCharacter);
+    const state = await this.resolveUserState(updatedCharacter.id, userId);
+    return { character: this.withUserState(transformed, state) };
   },
 
   // ============================================

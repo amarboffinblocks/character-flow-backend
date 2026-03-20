@@ -102,21 +102,7 @@ export const personaRepository = {
     const take = limit === 0 ? undefined : limit;
 
     // Build where clause
-    const where: {
-      userId: string;
-      rating?: Rating;
-      visibility?: Visibility;
-      isFavourite?: boolean;
-      isSaved?: boolean;
-      tags?: { hasEvery: string[] };
-      NOT?: Array<{
-        tags?: { hasSome: string[] };
-      }>;
-      OR?: Array<{
-        name?: { contains: string; mode: 'insensitive' };
-        description?: { contains: string; mode: 'insensitive' };
-      }>;
-    } = {
+    const where: Prisma.PersonaWhereInput = {
       userId,
     };
 
@@ -129,11 +115,25 @@ export const personaRepository = {
     }
 
     if (isFavourite !== undefined) {
-      where.isFavourite = isFavourite;
+      if (isFavourite) {
+        where.favorites = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId } } },
+        ];
+      }
     }
 
     if (isSaved !== undefined) {
-      where.isSaved = isSaved;
+      if (isSaved) {
+        where.saves = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId } } },
+        ];
+      }
     }
 
     if (tags && tags.length > 0) {
@@ -180,7 +180,8 @@ export const personaRepository = {
   },
 
   async findPublicPersonas(
-    params: PersonaQueryParams
+    params: PersonaQueryParams,
+    currentUserId?: string
   ): Promise<{ personas: Persona[]; total: number }> {
     const {
       page = 1,
@@ -200,20 +201,7 @@ export const personaRepository = {
     const take = limit === 0 ? undefined : limit;
 
     // Build where clause
-    const where: {
-      visibility: 'public';
-      rating?: Rating;
-      isFavourite?: boolean;
-      isSaved?: boolean;
-      tags?: { hasEvery: string[] };
-      NOT?: Array<{
-        tags?: { hasSome: string[] };
-      }>;
-      OR?: Array<{
-        name?: { contains: string; mode: 'insensitive' };
-        description?: { contains: string; mode: 'insensitive' };
-      }>;
-    } = {
+    const where: Prisma.PersonaWhereInput = {
       visibility: 'public',
     };
 
@@ -221,12 +209,26 @@ export const personaRepository = {
       where.rating = rating;
     }
 
-    if (isFavourite !== undefined) {
-      where.isFavourite = isFavourite;
+    if (currentUserId && isFavourite !== undefined) {
+      if (isFavourite) {
+        where.favorites = { some: { userId: currentUserId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId: currentUserId } } },
+        ];
+      }
     }
 
-    if (isSaved !== undefined) {
-      where.isSaved = isSaved;
+    if (currentUserId && isSaved !== undefined) {
+      if (isSaved) {
+        where.saves = { some: { userId: currentUserId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId: currentUserId } } },
+        ];
+      }
     }
 
     if (tags && tags.length > 0) {
@@ -272,6 +274,77 @@ export const personaRepository = {
     return { personas, total };
   },
 
+  async findAccessiblePersonas(
+    userId: string,
+    params: PersonaQueryParams
+  ): Promise<{ personas: Persona[]; total: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      rating,
+      tags,
+      excludeTags,
+      isFavourite,
+      isSaved,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params;
+
+    const skip = limit === 0 ? undefined : (page - 1) * limit;
+    const take = limit === 0 ? undefined : limit;
+
+    const where: Prisma.PersonaWhereInput = {
+      OR: [{ userId }, { visibility: 'public' }],
+    };
+
+    if (rating) where.rating = rating;
+    if (tags && tags.length > 0) where.tags = { hasEvery: tags };
+    if (excludeTags && excludeTags.length > 0) where.NOT = [{ tags: { hasSome: excludeTags } }];
+    if (search) {
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      ];
+    }
+
+    if (isFavourite !== undefined) {
+      if (isFavourite) where.favorites = { some: { userId } };
+      else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId } } },
+        ];
+      }
+    }
+
+    if (isSaved !== undefined) {
+      if (isSaved) where.saves = { some: { userId } };
+      else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId } } },
+        ];
+      }
+    }
+
+    const orderBy: Prisma.PersonaOrderByWithRelationInput = {};
+    if (sortBy === 'name') orderBy.name = sortOrder;
+    else if (sortBy === 'updatedAt') orderBy.updatedAt = sortOrder;
+    else orderBy.createdAt = sortOrder;
+
+    const [personas, total] = await Promise.all([
+      prisma.persona.findMany({ where, skip, take, orderBy }),
+      prisma.persona.count({ where }),
+    ]);
+
+    return { personas, total };
+  },
+
   async checkSlugExists(slug: string): Promise<boolean> {
     const persona = await prisma.persona.findUnique({
       where: { slug },
@@ -310,8 +383,7 @@ export const personaRepository = {
     if (data.lorebookId !== undefined) {
       updateData.lorebook = data.lorebookId ? { connect: { id: data.lorebookId } } : { disconnect: true };
     }
-    if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
-    if (data.isSaved !== undefined) updateData.isSaved = data.isSaved;
+    // user-specific favourite/saved state is handled by dedicated toggle methods
 
     return prisma.persona.update({
       where: { id },
@@ -333,35 +405,59 @@ export const personaRepository = {
     });
   },
 
-  async toggleFavourite(id: string): Promise<Persona> {
-    const persona = await prisma.persona.findUnique({
-      where: { id },
-      select: { isFavourite: true },
+  async toggleFavouriteForUser(id: string, userId: string): Promise<Persona> {
+    const existing = await prisma.personaFavorite.findUnique({
+      where: {
+        userId_personaId: { userId, personaId: id },
+      },
     });
 
-    if (!persona) {
-      throw new Error('Persona not found');
+    if (existing) {
+      await prisma.personaFavorite.delete({
+        where: {
+          userId_personaId: { userId, personaId: id },
+        },
+      });
+    } else {
+      await prisma.personaFavorite.create({
+        data: {
+          userId,
+          personaId: id,
+        },
+      });
     }
 
     return prisma.persona.update({
       where: { id },
-      data: { isFavourite: !persona.isFavourite },
+      data: {},
     });
   },
 
-  async toggleSaved(id: string): Promise<Persona> {
-    const persona = await prisma.persona.findUnique({
-      where: { id },
-      select: { isSaved: true },
+  async toggleSavedForUser(id: string, userId: string): Promise<Persona> {
+    const existing = await prisma.personaSaved.findUnique({
+      where: {
+        userId_personaId: { userId, personaId: id },
+      },
     });
 
-    if (!persona) {
-      throw new Error('Persona not found');
+    if (existing) {
+      await prisma.personaSaved.delete({
+        where: {
+          userId_personaId: { userId, personaId: id },
+        },
+      });
+    } else {
+      await prisma.personaSaved.create({
+        data: {
+          userId,
+          personaId: id,
+        },
+      });
     }
 
     return prisma.persona.update({
       where: { id },
-      data: { isSaved: !persona.isSaved },
+      data: {},
     });
   },
 };

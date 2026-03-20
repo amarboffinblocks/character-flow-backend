@@ -17,15 +17,36 @@ export const GET = async (req: Request, res: Response): Promise<void> => {
     // Get current user if authenticated
     const user = (req as AuthenticatedRequest).user;
 
-    if (user) {
-        // If authenticated, get user's characters (both public and private)
+    // visibility=public should always return global public catalog for everyone.
+    if (queryParams.visibility === 'public') {
+        const result = await characterService.getPublicCharacters(queryParams, user?.id);
+        sendSuccess(res, result, 'Public characters retrieved successfully');
+        return;
+    }
+
+    // visibility=private should remain private (creator-only list).
+    if (queryParams.visibility === 'private') {
+        if (!user) {
+            const result = { characters: [], pagination: { page: queryParams.page ?? 1, limit: queryParams.limit ?? 20, total: 0, totalPages: 0 } };
+            sendSuccess(res, result, 'Private characters are only visible to their creators');
+            return;
+        }
         const result = await characterService.getUserCharacters(user.id, queryParams);
         sendSuccess(res, result, 'Characters retrieved successfully');
-    } else {
-        // If not authenticated, get only public characters
-        const result = await characterService.getPublicCharacters(queryParams);
-        sendSuccess(res, result, 'Public characters retrieved successfully');
+        return;
     }
+
+    if (user) {
+        // "All" for authenticated users:
+        // - own private + own public + other users' public
+        const result = await characterService.getAccessibleCharacters(user.id, queryParams);
+        sendSuccess(res, result, 'Characters retrieved successfully');
+        return;
+    }
+
+    // Unauthenticated users only get public characters.
+    const result = await characterService.getPublicCharacters(queryParams, undefined);
+    sendSuccess(res, result, 'Public characters retrieved successfully');
 };
 
 // ============================================

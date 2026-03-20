@@ -18,12 +18,23 @@ export const GET = async (req: Request, res: Response): Promise<void> => {
   // Get current user if authenticated
   const user = (req as AuthenticatedRequest).user;
 
+  if (queryParams.visibility === 'public') {
+    const result = await lorebookService.getPublicLorebooks(queryParams, user?.id);
+    sendSuccess(res, result, 'Public lorebooks retrieved successfully');
+    return;
+  }
+
+  if (queryParams.visibility === 'private') {
+    const currentUser = requireCurrentUser(req);
+    const result = await lorebookService.getUserLorebooks(currentUser.id, queryParams);
+    sendSuccess(res, result, 'Private lorebooks retrieved successfully');
+    return;
+  }
+
   if (user) {
-    // If authenticated, get user's lorebooks
-    const result = await lorebookService.getUserLorebooks(user.id, queryParams);
+    const result = await lorebookService.getAccessibleLorebooks(user.id, queryParams);
     sendSuccess(res, result, 'Lorebooks retrieved successfully');
   } else {
-    // If not authenticated, get public lorebooks
     const result = await lorebookService.getPublicLorebooks(queryParams);
     sendSuccess(res, result, 'Public lorebooks retrieved successfully');
   }

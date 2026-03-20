@@ -40,8 +40,16 @@ const emailSchema = z
   .regex(REGEX_PATTERNS.EMAIL, 'Invalid email format');
 
 const phoneSchema = z
-  .string()
-  .regex(REGEX_PATTERNS.PHONE_E164, 'Phone number must be in E.164 format (e.g., +1234567890)')
+  .preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const digitsOnly = String(val).replace(/\D/g, '');
+      return digitsOnly.length > 0 ? digitsOnly : undefined;
+    },
+    z
+      .string()
+      .regex(/^\d{7,15}$/, 'Phone number must contain 7-15 digits')
+  )
   .optional();
 
 // ============================================

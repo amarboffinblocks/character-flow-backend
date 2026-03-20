@@ -94,6 +94,12 @@ model User {
   authTokens          AuthToken[]
   sessions            Session[]
   otps                Otp[]
+  favoriteCharacters  CharacterFavorite[]
+  savedCharacters     CharacterSaved[]
+  favoritePersonas    PersonaFavorite[]
+  savedPersonas       PersonaSaved[]
+  favoriteLorebooks   LorebookFavorite[]
+  savedLorebooks      LorebookSaved[]
 
   @@map("users")
 }
@@ -251,12 +257,40 @@ model Character {
   realm       Realm?       @relation(fields: [realmId], references: [id], onDelete: SetNull)
   chats       Chat[]
   backgrounds Background[]
+  favorites   CharacterFavorite[]
+  saves       CharacterSaved[]
 
   @@index([userId])
   @@index([slug])
   @@index([visibility])
   @@index([rating])
   @@map("characters")
+}
+
+model CharacterFavorite {
+  userId      String   @map("user_id")
+  characterId String   @map("character_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@id([userId, characterId])
+  @@index([characterId])
+  @@map("character_favorites")
+}
+
+model CharacterSaved {
+  userId      String   @map("user_id")
+  characterId String   @map("character_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@id([userId, characterId])
+  @@index([characterId])
+  @@map("character_saved")
 }
 
 // ============================================
@@ -285,10 +319,38 @@ model Persona {
   lorebook    Lorebook?    @relation(fields: [lorebookId], references: [id], onDelete: SetNull)
   characters  Character[]
   backgrounds Background[]
+  favorites   PersonaFavorite[]
+  saves       PersonaSaved[]
 
   @@index([userId])
   @@index([slug])
   @@map("personas")
+}
+
+model PersonaFavorite {
+  userId    String   @map("user_id")
+  personaId String   @map("persona_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  persona Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, personaId])
+  @@index([personaId])
+  @@map("persona_favorites")
+}
+
+model PersonaSaved {
+  userId    String   @map("user_id")
+  personaId String   @map("persona_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  persona Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, personaId])
+  @@index([personaId])
+  @@map("persona_saved")
 }
 
 // ============================================
@@ -315,10 +377,38 @@ model Lorebook {
   entries    LorebookEntry[]
   characters Character[]
   personas   Persona[]
+  favorites  LorebookFavorite[]
+  saves      LorebookSaved[]
 
   @@index([userId])
   @@index([slug])
   @@map("lorebooks")
+}
+
+model LorebookFavorite {
+  userId     String   @map("user_id")
+  lorebookId String   @map("lorebook_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lorebook Lorebook @relation(fields: [lorebookId], references: [id], onDelete: Cascade)
+
+  @@id([userId, lorebookId])
+  @@index([lorebookId])
+  @@map("lorebook_favorites")
+}
+
+model LorebookSaved {
+  userId     String   @map("user_id")
+  lorebookId String   @map("lorebook_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lorebook Lorebook @relation(fields: [lorebookId], references: [id], onDelete: Cascade)
+
+  @@id([userId, lorebookId])
+  @@index([lorebookId])
+  @@map("lorebook_saved")
 }
 
 // ============================================

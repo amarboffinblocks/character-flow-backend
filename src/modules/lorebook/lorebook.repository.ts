@@ -146,21 +146,7 @@ export const lorebookRepository = {
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: {
-      userId: string;
-      rating?: Rating;
-      visibility?: Visibility;
-      isFavourite?: boolean;
-      isSaved?: boolean;
-      tags?: { hasEvery: string[] };
-      NOT?: Array<{
-        tags?: { hasSome: string[] };
-      }>;
-      OR?: Array<{
-        name?: { contains: string; mode: 'insensitive' };
-        description?: { contains: string; mode: 'insensitive' };
-      }>;
-    } = {
+    const where: Prisma.LorebookWhereInput = {
       userId,
     };
 
@@ -173,11 +159,25 @@ export const lorebookRepository = {
     }
 
     if (isFavourite !== undefined) {
-      where.isFavourite = isFavourite;
+      if (isFavourite) {
+        where.favorites = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId } } },
+        ];
+      }
     }
 
     if (isSaved !== undefined) {
-      where.isSaved = isSaved;
+      if (isSaved) {
+        where.saves = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId } } },
+        ];
+      }
     }
 
     if (tags && tags.length > 0) {
@@ -232,7 +232,8 @@ export const lorebookRepository = {
   },
 
   async findPublicLorebooks(
-    params: LorebookQueryParams
+    params: LorebookQueryParams,
+    currentUserId?: string
   ): Promise<{ lorebooks: Lorebook[]; total: number }> {
     const {
       page = 1,
@@ -241,6 +242,8 @@ export const lorebookRepository = {
       rating,
       tags,
       excludeTags,
+      isFavourite,
+      isSaved,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = params;
@@ -248,23 +251,34 @@ export const lorebookRepository = {
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: {
-      visibility: 'public';
-      rating?: Rating;
-      tags?: { hasEvery: string[] };
-      NOT?: Array<{
-        tags?: { hasSome: string[] };
-      }>;
-      OR?: Array<{
-        name?: { contains: string; mode: 'insensitive' };
-        description?: { contains: string; mode: 'insensitive' };
-      }>;
-    } = {
+    const where: Prisma.LorebookWhereInput = {
       visibility: 'public',
     };
 
     if (rating) {
       where.rating = rating;
+    }
+
+    if (currentUserId && isFavourite !== undefined) {
+      if (isFavourite) {
+        where.favorites = { some: { userId: currentUserId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId: currentUserId } } },
+        ];
+      }
+    }
+
+    if (currentUserId && isSaved !== undefined) {
+      if (isSaved) {
+        where.saves = { some: { userId: currentUserId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId: currentUserId } } },
+        ];
+      }
     }
 
     if (tags && tags.length > 0) {
@@ -325,6 +339,89 @@ export const lorebookRepository = {
     return { lorebooks: lorebooksWithCount as Lorebook[], total };
   },
 
+  async findAccessibleLorebooks(
+    userId: string,
+    params: LorebookQueryParams
+  ): Promise<{ lorebooks: Lorebook[]; total: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      rating,
+      tags,
+      excludeTags,
+      isFavourite,
+      isSaved,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params;
+
+    const skip = (page - 1) * limit;
+    const where: Prisma.LorebookWhereInput = {
+      OR: [{ userId }, { visibility: 'public' }],
+    };
+
+    if (rating) where.rating = rating;
+    if (tags && tags.length > 0) where.tags = { hasEvery: tags };
+    if (excludeTags && excludeTags.length > 0) where.NOT = [{ tags: { hasSome: excludeTags } }];
+    if (search) {
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      ];
+    }
+
+    if (isFavourite !== undefined) {
+      if (isFavourite) where.favorites = { some: { userId } };
+      else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId } } },
+        ];
+      }
+    }
+
+    if (isSaved !== undefined) {
+      if (isSaved) where.saves = { some: { userId } };
+      else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId } } },
+        ];
+      }
+    }
+
+    const orderBy: Record<string, 'asc' | 'desc'> = {};
+    orderBy[sortBy] = sortOrder;
+
+    const [lorebooks, total] = await Promise.all([
+      prisma.lorebook.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          _count: { select: { entries: true } },
+        },
+      }),
+      prisma.lorebook.count({ where }),
+    ]);
+
+    const lorebooksWithCount = lorebooks.map((lorebook) => {
+      const { _count, ...lorebookData } = lorebook as Lorebook & { _count: { entries: number } };
+      return {
+        ...lorebookData,
+        entriesCount: _count.entries,
+      };
+    });
+
+    return { lorebooks: lorebooksWithCount as Lorebook[], total };
+  },
+
   async createLorebook(data: CreateLorebookData): Promise<Lorebook> {
     return prisma.lorebook.create({
       data: {
@@ -353,8 +450,7 @@ export const lorebookRepository = {
     if (data.visibility) updateData.visibility = data.visibility;
     if (data.avatar !== undefined) updateData.avatar = data.avatar ? (data.avatar as never) : null;
     if (data.tags !== undefined) updateData.tags = data.tags;
-    if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
-    if (data.isSaved !== undefined) updateData.isSaved = data.isSaved;
+    // user-specific favourite/saved state is handled by dedicated toggle methods
 
     return prisma.lorebook.update({
       where: { id },
@@ -483,6 +579,62 @@ export const lorebookRepository = {
   async deleteEntriesByLorebook(lorebookId: string): Promise<void> {
     await prisma.lorebookEntry.deleteMany({
       where: { lorebookId },
+    });
+  },
+
+  async toggleFavouriteForUser(id: string, userId: string): Promise<Lorebook> {
+    const existing = await prisma.lorebookFavorite.findUnique({
+      where: {
+        userId_lorebookId: { userId, lorebookId: id },
+      },
+    });
+
+    if (existing) {
+      await prisma.lorebookFavorite.delete({
+        where: {
+          userId_lorebookId: { userId, lorebookId: id },
+        },
+      });
+    } else {
+      await prisma.lorebookFavorite.create({
+        data: {
+          userId,
+          lorebookId: id,
+        },
+      });
+    }
+
+    return prisma.lorebook.update({
+      where: { id },
+      data: {},
+    });
+  },
+
+  async toggleSavedForUser(id: string, userId: string): Promise<Lorebook> {
+    const existing = await prisma.lorebookSaved.findUnique({
+      where: {
+        userId_lorebookId: { userId, lorebookId: id },
+      },
+    });
+
+    if (existing) {
+      await prisma.lorebookSaved.delete({
+        where: {
+          userId_lorebookId: { userId, lorebookId: id },
+        },
+      });
+    } else {
+      await prisma.lorebookSaved.create({
+        data: {
+          userId,
+          lorebookId: id,
+        },
+      });
+    }
+
+    return prisma.lorebook.update({
+      where: { id },
+      data: {},
     });
   },
 };

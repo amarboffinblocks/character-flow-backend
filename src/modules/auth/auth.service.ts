@@ -42,9 +42,9 @@ export const authService = {
   // ============================================
 
   async register(input: RegisterInput): Promise<RegisterResponse> {
-    // Validate phone number if provided
-    if (input.phoneNumber && !smsService.isValidPhoneNumber(input.phoneNumber)) {
-      throw createError.validation('Invalid phone number format. Must be in E.164 format (e.g., +1234567890)');
+    // Validate phone number if provided (simple digits-only format).
+    if (input.phoneNumber && !/^\d{7,15}$/.test(input.phoneNumber)) {
+      throw createError.validation('Invalid phone number format. Use 7-15 digits.');
     }
 
     // Check if email already exists

@@ -118,6 +118,57 @@ function normalizeImportEntries(entries: unknown): CreateLorebookEntryInput[] {
 // ============================================
 
 export const lorebookService = {
+  withUserState(lorebook: any, state: { isFavourite: boolean; isSaved: boolean }) {
+    return {
+      ...lorebook,
+      isFavourite: state.isFavourite,
+      isSaved: state.isSaved,
+    };
+  },
+
+  async resolveUserState(lorebookId: string, userId?: string): Promise<{ isFavourite: boolean; isSaved: boolean }> {
+    if (!userId) return { isFavourite: false, isSaved: false };
+
+    const [favourite, saved] = await Promise.all([
+      prisma.lorebookFavorite.findUnique({
+        where: { userId_lorebookId: { userId, lorebookId } },
+        select: { userId: true },
+      }),
+      prisma.lorebookSaved.findUnique({
+        where: { userId_lorebookId: { userId, lorebookId } },
+        select: { userId: true },
+      }),
+    ]);
+
+    return { isFavourite: Boolean(favourite), isSaved: Boolean(saved) };
+  },
+
+  async resolveUserStateForList(lorebookIds: string[], userId?: string): Promise<Map<string, { isFavourite: boolean; isSaved: boolean }>> {
+    const map = new Map<string, { isFavourite: boolean; isSaved: boolean }>();
+    for (const id of lorebookIds) map.set(id, { isFavourite: false, isSaved: false });
+    if (!userId || lorebookIds.length === 0) return map;
+
+    const [favourites, saved] = await Promise.all([
+      prisma.lorebookFavorite.findMany({
+        where: { userId, lorebookId: { in: lorebookIds } },
+        select: { lorebookId: true },
+      }),
+      prisma.lorebookSaved.findMany({
+        where: { userId, lorebookId: { in: lorebookIds } },
+        select: { lorebookId: true },
+      }),
+    ]);
+
+    for (const row of favourites) {
+      const prev = map.get(row.lorebookId) ?? { isFavourite: false, isSaved: false };
+      map.set(row.lorebookId, { ...prev, isFavourite: true });
+    }
+    for (const row of saved) {
+      const prev = map.get(row.lorebookId) ?? { isFavourite: false, isSaved: false };
+      map.set(row.lorebookId, { ...prev, isSaved: true });
+    }
+    return map;
+  },
   // ============================================
   // Create Lorebook
   // ============================================
@@ -232,7 +283,9 @@ export const lorebookService = {
       throw createError.notFound('Lorebook not found after creation');
     }
 
-    return { lorebook: await transformEntityImageUrls(lorebookWithEntries) };
+    const transformed = await transformEntityImageUrls(lorebookWithEntries);
+    const state = await this.resolveUserState(lorebook.id, userId);
+    return { lorebook: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -290,7 +343,9 @@ export const lorebookService = {
       throw createError.forbidden('Lorebook is private');
     }
 
-    return { lorebook: await transformEntityImageUrls(lorebook) };
+    const transformed = await transformEntityImageUrls(lorebook);
+    const state = await this.resolveUserState(lorebook.id, userId);
+    return { lorebook: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -309,7 +364,9 @@ export const lorebookService = {
       throw createError.forbidden('Lorebook is private');
     }
 
-    return { lorebook: await transformEntityImageUrls(lorebook) };
+    const transformed = await transformEntityImageUrls(lorebook);
+    const state = await this.resolveUserState(lorebook.id, userId);
+    return { lorebook: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -323,8 +380,11 @@ export const lorebookService = {
     const limit = params.limit ?? 20;
     const totalPages = Math.ceil(total / limit);
 
+    const stateMap = await this.resolveUserStateForList(lorebooks.map((l) => l.id), userId);
     return {
-      lorebooks: await transformEntitiesImageUrls(lorebooks),
+      lorebooks: (await transformEntitiesImageUrls(lorebooks)).map((lorebook: any) =>
+        this.withUserState(lorebook, stateMap.get(lorebook.id) ?? { isFavourite: false, isSaved: false })
+      ),
       pagination: {
         page,
         limit,
@@ -338,15 +398,39 @@ export const lorebookService = {
   // Get Public Lorebooks
   // ============================================
 
-  async getPublicLorebooks(params: LorebookQueryParams): Promise<LorebookListResponse> {
-    const { lorebooks, total } = await lorebookRepository.findPublicLorebooks(params);
+  async getPublicLorebooks(params: LorebookQueryParams, userId?: string): Promise<LorebookListResponse> {
+    const { lorebooks, total } = await lorebookRepository.findPublicLorebooks(params, userId);
 
     const page = params.page ?? 1;
     const limit = params.limit ?? 20;
     const totalPages = Math.ceil(total / limit);
 
+    const stateMap = await this.resolveUserStateForList(lorebooks.map((l) => l.id), userId);
     return {
-      lorebooks: await transformEntitiesImageUrls(lorebooks),
+      lorebooks: (await transformEntitiesImageUrls(lorebooks)).map((lorebook: any) =>
+        this.withUserState(lorebook, stateMap.get(lorebook.id) ?? { isFavourite: false, isSaved: false })
+      ),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  },
+
+  async getAccessibleLorebooks(userId: string, params: LorebookQueryParams): Promise<LorebookListResponse> {
+    const { lorebooks, total } = await lorebookRepository.findAccessibleLorebooks(userId, params);
+
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 20;
+    const totalPages = Math.ceil(total / limit);
+    const stateMap = await this.resolveUserStateForList(lorebooks.map((l) => l.id), userId);
+
+    return {
+      lorebooks: (await transformEntitiesImageUrls(lorebooks)).map((lorebook: any) =>
+        this.withUserState(lorebook, stateMap.get(lorebook.id) ?? { isFavourite: false, isSaved: false })
+      ),
       pagination: {
         page,
         limit,
@@ -415,8 +499,6 @@ export const lorebookService = {
       ...(input.visibility && { visibility: input.visibility }),
       ...(input.avatar !== undefined && { avatar: input.avatar }),
       ...(input.tags !== undefined && { tags: input.tags }),
-      ...(input.isFavourite !== undefined && { isFavourite: input.isFavourite }),
-      ...(input.isSaved !== undefined && { isSaved: input.isSaved }),
     };
 
     const lorebook = await lorebookRepository.updateLorebook(id, updateData);
@@ -526,7 +608,9 @@ export const lorebookService = {
       throw createError.notFound('Lorebook not found after update');
     }
 
-    return { lorebook: await transformEntityImageUrls(lorebookWithEntries) };
+    const transformed = await transformEntityImageUrls(lorebookWithEntries);
+    const state = await this.resolveUserState(lorebookWithEntries.id, userId);
+    return { lorebook: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -641,15 +725,14 @@ export const lorebookService = {
       throw createError.notFound('Lorebook not found');
     }
 
-    if (lorebook.userId !== userId) {
+    if (lorebook.visibility === 'private' && lorebook.userId !== userId) {
       throw createError.forbidden('You do not have permission to modify this lorebook');
     }
 
-    const updatedLorebook = await lorebookRepository.updateLorebook(id, {
-      isFavourite: !lorebook.isFavourite,
-    });
-
-    return { lorebook: await transformEntityImageUrls(updatedLorebook) };
+    const updatedLorebook = await lorebookRepository.toggleFavouriteForUser(id, userId);
+    const transformed = await transformEntityImageUrls(updatedLorebook);
+    const state = await this.resolveUserState(updatedLorebook.id, userId);
+    return { lorebook: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -663,15 +746,14 @@ export const lorebookService = {
       throw createError.notFound('Lorebook not found');
     }
 
-    if (lorebook.userId !== userId) {
+    if (lorebook.visibility === 'private' && lorebook.userId !== userId) {
       throw createError.forbidden('You do not have permission to modify this lorebook');
     }
 
-    const updatedLorebook = await lorebookRepository.updateLorebook(id, {
-      isSaved: !lorebook.isSaved,
-    });
-
-    return { lorebook: await transformEntityImageUrls(updatedLorebook) };
+    const updatedLorebook = await lorebookRepository.toggleSavedForUser(id, userId);
+    const transformed = await transformEntityImageUrls(updatedLorebook);
+    const state = await this.resolveUserState(updatedLorebook.id, userId);
+    return { lorebook: this.withUserState(transformed, state) };
   },
 
   // ============================================

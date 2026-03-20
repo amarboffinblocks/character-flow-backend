@@ -84,11 +84,25 @@ export const characterRepository = {
     }
 
     if (isFavourite !== undefined) {
-      where.isFavourite = isFavourite;
+      if (isFavourite) {
+        where.favorites = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId } } },
+        ];
+      }
     }
 
     if (isSaved !== undefined) {
-      where.isSaved = isSaved;
+      if (isSaved) {
+        where.saves = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId } } },
+        ];
+      }
     }
 
     if (tags && tags.length > 0) {
@@ -131,7 +145,8 @@ export const characterRepository = {
   },
 
   async findPublicCharacters(
-    params: CharacterQueryParams
+    params: CharacterQueryParams,
+    currentUserId?: string
   ): Promise<{ characters: Character[]; total: number }> {
     const {
       page = 1,
@@ -140,6 +155,8 @@ export const characterRepository = {
       rating,
       tags,
       excludeTags,
+      isFavourite,
+      isSaved,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = params;
@@ -167,6 +184,28 @@ export const characterRepository = {
       ];
     }
 
+    if (currentUserId && isFavourite !== undefined) {
+      if (isFavourite) {
+        where.favorites = { some: { userId: currentUserId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId: currentUserId } } },
+        ];
+      }
+    }
+
+    if (currentUserId && isSaved !== undefined) {
+      if (isSaved) {
+        where.saves = { some: { userId: currentUserId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId: currentUserId } } },
+        ];
+      }
+    }
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -175,6 +214,111 @@ export const characterRepository = {
     }
 
     // Build orderBy clause
+    const orderBy: Record<string, 'asc' | 'desc'> = {};
+    orderBy[sortBy] = sortOrder;
+
+    const [characters, total] = await Promise.all([
+      prisma.character.findMany({
+        where,
+        ...(skip !== undefined && { skip }),
+        ...(take !== undefined && { take }),
+        orderBy,
+        include: {
+          persona: true,
+          lorebook: true,
+          realm: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatar: true,
+            },
+          },
+        },
+      }),
+      prisma.character.count({ where }),
+    ]);
+
+    return { characters, total };
+  },
+
+  async findAccessibleCharacters(
+    userId: string,
+    params: CharacterQueryParams
+  ): Promise<{ characters: Character[]; total: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      rating,
+      tags,
+      excludeTags,
+      isFavourite,
+      isSaved,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = params;
+
+    const skip = limit === 0 ? undefined : (page - 1) * limit;
+    const take = limit === 0 ? undefined : limit;
+
+    // Accessible set for authenticated users:
+    // - their own characters (public + private)
+    // - other users' public characters
+    const where: Prisma.CharacterWhereInput = {
+      OR: [
+        { userId },
+        { visibility: 'public' },
+      ],
+    };
+
+    if (rating) {
+      where.rating = rating as Rating;
+    }
+
+    if (tags && tags.length > 0) {
+      where.tags = { hasEvery: tags };
+    }
+
+    if (excludeTags && excludeTags.length > 0) {
+      where.NOT = [
+        { tags: { hasSome: excludeTags } },
+      ];
+    }
+
+    if (isFavourite !== undefined) {
+      if (isFavourite) {
+        where.favorites = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { favorites: { some: { userId } } },
+        ];
+      }
+    }
+
+    if (isSaved !== undefined) {
+      if (isSaved) {
+        where.saves = { some: { userId } };
+      } else {
+        where.NOT = [
+          ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+          { saves: { some: { userId } } },
+        ];
+      }
+    }
+
+    if (search) {
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      ];
+    }
+
     const orderBy: Record<string, 'asc' | 'desc'> = {};
     orderBy[sortBy] = sortOrder;
 
@@ -271,8 +415,7 @@ export const characterRepository = {
       updateData.realm = data.realmId ? { connect: { id: data.realmId } } : { disconnect: true };
     }
 
-    if (data.isFavourite !== undefined) updateData.isFavourite = data.isFavourite;
-    if (data.isSaved !== undefined) updateData.isSaved = data.isSaved;
+    // user-specific favourite/saved state is handled by dedicated toggle methods
     if (data.tokens !== undefined) updateData.tokens = data.tokens;
 
     return prisma.character.update({
@@ -324,6 +467,84 @@ export const characterRepository = {
     await prisma.character.update({
       where: { id },
       data: { tokens },
+    });
+  },
+
+  async toggleFavouriteForUser(id: string, userId: string): Promise<Character> {
+    const existing = await prisma.characterFavorite.findUnique({
+      where: {
+        userId_characterId: {
+          userId,
+          characterId: id,
+        },
+      },
+    });
+
+    if (existing) {
+      await prisma.characterFavorite.delete({
+        where: {
+          userId_characterId: {
+            userId,
+            characterId: id,
+          },
+        },
+      });
+    } else {
+      await prisma.characterFavorite.create({
+        data: {
+          userId,
+          characterId: id,
+        },
+      });
+    }
+
+    return prisma.character.update({
+      where: { id },
+      data: {},
+      include: {
+        persona: true,
+        lorebook: true,
+        realm: true,
+      },
+    });
+  },
+
+  async toggleSavedForUser(id: string, userId: string): Promise<Character> {
+    const existing = await prisma.characterSaved.findUnique({
+      where: {
+        userId_characterId: {
+          userId,
+          characterId: id,
+        },
+      },
+    });
+
+    if (existing) {
+      await prisma.characterSaved.delete({
+        where: {
+          userId_characterId: {
+            userId,
+            characterId: id,
+          },
+        },
+      });
+    } else {
+      await prisma.characterSaved.create({
+        data: {
+          userId,
+          characterId: id,
+        },
+      });
+    }
+
+    return prisma.character.update({
+      where: { id },
+      data: {},
+      include: {
+        persona: true,
+        lorebook: true,
+        realm: true,
+      },
     });
   },
 };

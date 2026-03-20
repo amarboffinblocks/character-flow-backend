@@ -3,6 +3,7 @@ import { tagService } from '../tag/index.js';
 import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { processImageUpload } from '../../utils/image.helper.js';
+import { prisma } from '../../lib/prisma.js';
 import {
   deleteFromS3IfExists,
   transformEntityImageUrls,
@@ -25,6 +26,57 @@ import type { Persona } from '@prisma/client';
 // ============================================
 
 export const personaService = {
+  withUserState(persona: any, state: { isFavourite: boolean; isSaved: boolean }) {
+    return {
+      ...persona,
+      isFavourite: state.isFavourite,
+      isSaved: state.isSaved,
+    };
+  },
+
+  async resolveUserState(personaId: string, userId?: string): Promise<{ isFavourite: boolean; isSaved: boolean }> {
+    if (!userId) return { isFavourite: false, isSaved: false };
+
+    const [favourite, saved] = await Promise.all([
+      prisma.personaFavorite.findUnique({
+        where: { userId_personaId: { userId, personaId } },
+        select: { userId: true },
+      }),
+      prisma.personaSaved.findUnique({
+        where: { userId_personaId: { userId, personaId } },
+        select: { userId: true },
+      }),
+    ]);
+
+    return { isFavourite: Boolean(favourite), isSaved: Boolean(saved) };
+  },
+
+  async resolveUserStateForList(personaIds: string[], userId?: string): Promise<Map<string, { isFavourite: boolean; isSaved: boolean }>> {
+    const map = new Map<string, { isFavourite: boolean; isSaved: boolean }>();
+    for (const id of personaIds) map.set(id, { isFavourite: false, isSaved: false });
+    if (!userId || personaIds.length === 0) return map;
+
+    const [favourites, saved] = await Promise.all([
+      prisma.personaFavorite.findMany({
+        where: { userId, personaId: { in: personaIds } },
+        select: { personaId: true },
+      }),
+      prisma.personaSaved.findMany({
+        where: { userId, personaId: { in: personaIds } },
+        select: { personaId: true },
+      }),
+    ]);
+
+    for (const row of favourites) {
+      const prev = map.get(row.personaId) ?? { isFavourite: false, isSaved: false };
+      map.set(row.personaId, { ...prev, isFavourite: true });
+    }
+    for (const row of saved) {
+      const prev = map.get(row.personaId) ?? { isFavourite: false, isSaved: false };
+      map.set(row.personaId, { ...prev, isSaved: true });
+    }
+    return map;
+  },
   // ============================================
   // Create Persona
   // ============================================
@@ -82,7 +134,9 @@ export const personaService = {
       throw createError.notFound('Persona not found after creation');
     }
 
-    return { persona: await transformEntityImageUrls(personaWithRelations) };
+    const transformed = await transformEntityImageUrls(personaWithRelations);
+    const state = await this.resolveUserState(persona.id, userId);
+    return { persona: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -101,7 +155,9 @@ export const personaService = {
       throw createError.forbidden('You do not have access to this persona');
     }
 
-    return { persona: await transformEntityImageUrls(persona) };
+    const transformed = await transformEntityImageUrls(persona);
+    const state = await this.resolveUserState(persona.id, userId);
+    return { persona: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -120,7 +176,9 @@ export const personaService = {
       throw createError.forbidden('You do not have access to this persona');
     }
 
-    return { persona: await transformEntityImageUrls(persona) };
+    const transformed = await transformEntityImageUrls(persona);
+    const state = await this.resolveUserState(persona.id, userId);
+    return { persona: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -135,8 +193,11 @@ export const personaService = {
 
     const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
 
+    const stateMap = await this.resolveUserStateForList(personas.map((p) => p.id), userId);
     return {
-      personas: await transformEntitiesImageUrls(personas),
+      personas: (await transformEntitiesImageUrls(personas)).map((persona: any) =>
+        this.withUserState(persona, stateMap.get(persona.id) ?? { isFavourite: false, isSaved: false })
+      ),
       pagination: {
         page,
         limit,
@@ -150,15 +211,37 @@ export const personaService = {
   // List Public Personas
   // ============================================
 
-  async listPublicPersonas(params: PersonaQueryParams): Promise<PersonaListResponse> {
+  async listPublicPersonas(params: PersonaQueryParams, userId?: string): Promise<PersonaListResponse> {
     const { page = 1, limit = 20 } = params;
 
-    const { personas, total } = await personaRepository.findPublicPersonas(params);
+    const { personas, total } = await personaRepository.findPublicPersonas(params, userId);
 
     const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
 
+    const stateMap = await this.resolveUserStateForList(personas.map((p) => p.id), userId);
     return {
-      personas: await transformEntitiesImageUrls(personas),
+      personas: (await transformEntitiesImageUrls(personas)).map((persona: any) =>
+        this.withUserState(persona, stateMap.get(persona.id) ?? { isFavourite: false, isSaved: false })
+      ),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  },
+
+  async listAccessiblePersonas(userId: string, params: PersonaQueryParams): Promise<PersonaListResponse> {
+    const { page = 1, limit = 20 } = params;
+    const { personas, total } = await personaRepository.findAccessiblePersonas(userId, params);
+    const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
+    const stateMap = await this.resolveUserStateForList(personas.map((p) => p.id), userId);
+
+    return {
+      personas: (await transformEntitiesImageUrls(personas)).map((persona: any) =>
+        this.withUserState(persona, stateMap.get(persona.id) ?? { isFavourite: false, isSaved: false })
+      ),
       pagination: {
         page,
         limit,
@@ -232,8 +315,6 @@ export const personaService = {
       ...(input.backgroundImg !== undefined && { backgroundImg: input.backgroundImg }),
       ...(input.tags !== undefined && { tags: input.tags }),
       ...(input.lorebookId !== undefined && { lorebookId: input.lorebookId }),
-      ...(input.isFavourite !== undefined && { isFavourite: input.isFavourite }),
-      ...(input.isSaved !== undefined && { isSaved: input.isSaved }),
     };
 
     // Update persona
@@ -245,7 +326,9 @@ export const personaService = {
       throw createError.notFound('Persona not found after update');
     }
 
-    return { persona: await transformEntityImageUrls(updatedPersona) };
+    const transformed = await transformEntityImageUrls(updatedPersona);
+    const state = await this.resolveUserState(updatedPersona.id, userId);
+    return { persona: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -323,14 +406,14 @@ export const personaService = {
       throw createError.notFound('Persona not found');
     }
 
-    if (persona.userId !== userId) {
+    if (persona.visibility === 'private' && persona.userId !== userId) {
       throw createError.forbidden('You do not have permission to modify this persona');
     }
 
-    // Toggle favourite
-    const updatedPersona = await personaRepository.toggleFavourite(id);
-
-    return { persona: await transformEntityImageUrls(updatedPersona) };
+    const updatedPersona = await personaRepository.toggleFavouriteForUser(id, userId);
+    const transformed = await transformEntityImageUrls(updatedPersona);
+    const state = await this.resolveUserState(updatedPersona.id, userId);
+    return { persona: this.withUserState(transformed, state) };
   },
 
   // ============================================
@@ -344,14 +427,14 @@ export const personaService = {
       throw createError.notFound('Persona not found');
     }
 
-    if (persona.userId !== userId) {
+    if (persona.visibility === 'private' && persona.userId !== userId) {
       throw createError.forbidden('You do not have permission to modify this persona');
     }
 
-    // Toggle saved
-    const updatedPersona = await personaRepository.toggleSaved(id);
-
-    return { persona: updatedPersona };
+    const updatedPersona = await personaRepository.toggleSavedForUser(id, userId);
+    const transformed = await transformEntityImageUrls(updatedPersona);
+    const state = await this.resolveUserState(updatedPersona.id, userId);
+    return { persona: this.withUserState(transformed, state) };
   },
 
   // ============================================
