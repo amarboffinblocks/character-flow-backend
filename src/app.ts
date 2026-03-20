@@ -26,24 +26,24 @@ export const createApp = async (): Promise<express.Application> => {
 
   // CORS configuration - supports ngrok, multiple origins, and allow-all
   app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
 
-    const allowedOrigins = config.cors.origin
-      .split(',')
-      .map(o => o.trim());
+      const allowedOrigins = config.cors.origin
+        .split(',')
+        .map(o => o.trim());
 
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-      return callback(null, true);
-    }
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
 
-    logger.warn({ origin, allowedOrigins }, 'CORS blocked request');
-    return callback(new Error(`Origin ${origin} not allowed by CORS`));
-  },
-  credentials: true,
-}));
-  
-app.options('*', cors());
+      logger.warn({ origin, allowedOrigins }, 'CORS blocked request');
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
+    credentials: true,
+  }));
+
+  app.options('*', cors());
 
   // ============================================
   // Security Middleware
@@ -154,8 +154,8 @@ app.options('*', cors());
   // ============================================
 
   const endpointsDir = join(__dirname, 'endpoints');
-  const apiRouter = await createFileRouter(endpointsDir, `/api/${config.app.apiVersion}`);
-  app.use(`/api/${config.app.apiVersion}`, apiRouter);
+  const apiRouter = await createFileRouter(endpointsDir, `/api/v1`);
+  app.use(`/api/v1`, apiRouter);
 
   // ============================================
   // Health Check (outside versioned API)
