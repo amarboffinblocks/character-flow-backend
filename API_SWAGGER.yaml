@@ -1357,6 +1357,103 @@ paths:
                 message: "Model retrieved successfully"
         '404':
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Models
+      summary: Update Model (Admin Only)
+      description: |
+        Update an existing AI model configuration by ID. **Admin access required.**
+        
+        Supports partial updates. Only provided fields will be updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Model UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                slug:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  pattern: '^[a-z0-9-]+$'
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                provider:
+                  type: string
+                  enum: [openai, gemini, aws, anthropic, local]
+                modelName:
+                  type: string
+                  maxLength: 255
+                  nullable: true
+                isActive:
+                  type: boolean
+                isDefault:
+                  type: boolean
+                metadata:
+                  type: object
+                  nullable: true
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Model updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelResponse'
+              example:
+                success: true
+                data:
+                  model:
+                    id: "123e4567-e89b-12d3-a456-426614174000"
+                    name: "GPT-4o Mini (Updated)"
+                    slug: "gpt-4o-mini"
+                    description: "Updated model description"
+                    provider: "openai"
+                    modelName: "gpt-4o-mini"
+                    isActive: true
+                    isDefault: false
+                    createdAt: "2024-01-15T10:00:00Z"
+                    updatedAt: "2024-01-16T08:30:00Z"
+                message: "Model updated successfully"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /chats:
     get:
