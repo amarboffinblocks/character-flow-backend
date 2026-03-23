@@ -130,11 +130,10 @@ export const folderService = {
       throw createError.notFound('Folder not found');
     }
 
-    // When deleting a folder, chats will be set to null (uncategorized) due to onDelete: SetNull
-    await folderRepository.deleteFolder(id);
+    const { deletedChats } = await folderRepository.deleteFolder(id);
 
     return {
-      message: 'Folder deleted successfully. Chats in this folder are now uncategorized.',
+      message: `Folder deleted successfully. ${deletedChats} chat(s) in this folder were also deleted.`,
     };
   },
 };

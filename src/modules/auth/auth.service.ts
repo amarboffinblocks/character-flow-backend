@@ -32,6 +32,8 @@ import type {
   OtpRequestResponse,
 } from './auth.types.js';
 
+const USERNAME_CHANGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 // ============================================
 // Auth Service with 2FA/OTP
 // ============================================
@@ -637,8 +639,17 @@ export const authService = {
       throw createError.notFound('User not found');
     }
 
-    // If username is being changed, check if it's available
+    // If username is being changed, enforce cooldown and availability checks
     if (data.username && data.username !== user.username) {
+      if (user.usernameChangedAt) {
+        const elapsedMs = Date.now() - new Date(user.usernameChangedAt).getTime();
+        if (elapsedMs < USERNAME_CHANGE_COOLDOWN_MS) {
+          const remainingMs = USERNAME_CHANGE_COOLDOWN_MS - elapsedMs;
+          const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
+          throw createError.validation(`You can change your username again in ${remainingHours} hour(s).`);
+        }
+      }
+
       const existingUser = await authRepository.findUserByUsername(data.username);
       if (existingUser) {
         throw createError.conflict('Username already taken');
@@ -666,8 +677,13 @@ export const authService = {
       if (oldBg?.url) await deleteFromS3IfExists(oldBg.url);
     }
 
+    const isUsernameChanged = Boolean(data.username && data.username !== user.username);
+
     // Update user
-    const updatedUser = await authRepository.updateUser(userId, data);
+    const updatedUser = await authRepository.updateUser(userId, {
+      ...data,
+      ...(isUsernameChanged ? { usernameChangedAt: new Date() } : {}),
+    });
 
     // Invalidate username cache if username changed
     if (data.username && data.username !== user.username) {

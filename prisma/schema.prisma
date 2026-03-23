@@ -78,6 +78,7 @@ model User {
   tagsToAvoid       String[]         @default([]) @map("tags_to_avoid")
   aboutMe           String?          @map("about_me")
   following         String[]         @default([])
+  usernameChangedAt DateTime?        @map("username_changed_at")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 

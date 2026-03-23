@@ -54,7 +54,7 @@ export function streamLLM({
 
   // Accumulate partial text for saving on error (stream interrupted midway)
   const partialText = { current: "" };
-
+  console.log("messagedddddddd", messages)
   const result = streamText({
     model: aiProvider(modelName),
     messages,

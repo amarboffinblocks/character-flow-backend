@@ -118,10 +118,20 @@ export const folderRepository = {
     });
   },
 
-  async deleteFolder(id: string): Promise<void> {
-    await prisma.folder.delete({
-      where: { id },
+  async deleteFolder(id: string): Promise<{ deletedChats: number }> {
+    const result = await prisma.$transaction(async (tx) => {
+      const deletedChats = await tx.chat.deleteMany({
+        where: { folderId: id },
+      });
+
+      await tx.folder.delete({
+        where: { id },
+      });
+
+      return { deletedChats: deletedChats.count };
     });
+
+    return result;
   },
 
   async findFolderByIdAndUser(id: string, userId: string): Promise<FolderWithCount | null> {

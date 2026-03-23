@@ -92,6 +92,7 @@ export const authRepository = {
     data: {
       name?: string;
       username?: string;
+      usernameChangedAt?: Date;
       aboutMe?: string | null;
       theme?: string | null;
       fontStyle?: string | null;
@@ -111,6 +112,7 @@ export const authRepository = {
       data: {
         ...(data.name && { name: data.name }),
         ...(data.username && { username: data.username }),
+        ...(data.usernameChangedAt && { usernameChangedAt: data.usernameChangedAt }),
         ...(data.aboutMe !== undefined && { aboutMe: data.aboutMe }),
         ...(data.theme !== undefined && { theme: data.theme }),
         ...(data.fontStyle !== undefined && { fontStyle: data.fontStyle }),

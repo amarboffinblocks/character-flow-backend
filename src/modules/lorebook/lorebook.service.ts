@@ -32,6 +32,31 @@ import type { Lorebook, LorebookEntry } from '@prisma/client';
 
 const PRIORITY_MAX = 100;
 
+async function generateFallbackLorebookName(userId: string): Promise<string> {
+  const existingLorebooks = await prisma.lorebook.findMany({
+    where: {
+      userId,
+      name: {
+        startsWith: 'lorebook',
+        mode: 'insensitive',
+      },
+    },
+    select: { name: true },
+  });
+
+  let maxSuffix = 0;
+  for (const lorebook of existingLorebooks) {
+    const match = /^lorebook(\d+)$/i.exec(lorebook.name.trim());
+    if (!match) continue;
+    const num = Number(match[1]);
+    if (Number.isFinite(num) && num > maxSuffix) {
+      maxSuffix = num;
+    }
+  }
+
+  return `lorebook${maxSuffix + 1}`;
+}
+
 function normalizeImportEntries(entries: unknown): CreateLorebookEntryInput[] {
   let list: CreateLorebookEntryInput[] = [];
 
@@ -293,9 +318,8 @@ export const lorebookService = {
   // ============================================
 
   async importLorebook(userId: string, lorebookData: any): Promise<LorebookResponse> {
-    if (!lorebookData.name || typeof lorebookData.name !== 'string') {
-      throw createError.badRequest('Lorebook name is required');
-    }
+    const rawName = typeof lorebookData?.name === 'string' ? lorebookData.name.trim() : '';
+    const resolvedName = rawName || await generateFallbackLorebookName(userId);
 
     const entries = normalizeImportEntries(lorebookData.entries);
 
@@ -315,7 +339,7 @@ export const lorebookService = {
     }
 
     const input: CreateLorebookInput = {
-      name: lorebookData.name.trim(),
+      name: resolvedName,
       description: lorebookData.description != null ? String(lorebookData.description).trim() : undefined,
       rating: ratingCategory,
       visibility: (lorebookData.visibility === 'public' || lorebookData.visibility === 'private') ? lorebookData.visibility : 'private',

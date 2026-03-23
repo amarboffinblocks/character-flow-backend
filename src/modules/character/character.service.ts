@@ -560,14 +560,15 @@ export const characterService = {
   // ============================================
 
   async duplicateCharacter(id: string, userId: string): Promise<CharacterResponse> {
-    // Verify character exists and belongs to user
+    // Verify character exists and access rights
     const character = await characterRepository.findCharacterById(id);
 
     if (!character) {
       throw createError.notFound('Character not found');
     }
 
-    if (character.userId !== userId) {
+    const canDuplicate = character.userId === userId || character.visibility === 'public';
+    if (!canDuplicate) {
       throw createError.forbidden('You do not have permission to duplicate this character');
     }
 
@@ -614,7 +615,7 @@ export const characterService = {
       scenario: character.scenario,
       summary: character.summary,
       rating: character.rating,
-      visibility: character.visibility,
+      visibility: "private",
       avatar: character.avatar as Record<string, unknown> | null,
       backgroundImg: character.backgroundImg as Record<string, unknown> | null,
       tags: character.tags,
@@ -647,7 +648,7 @@ export const characterService = {
       throw createError.badRequest('Maximum 100 characters can be duplicated at once');
     }
 
-    // Fetch all characters and verify ownership
+    // Fetch all characters and verify access rights
     const characters = await Promise.all(
       characterIds.map((id) => characterRepository.findCharacterById(id))
     );
@@ -658,8 +659,12 @@ export const characterService = {
       throw createError.notFound('One or more characters not found');
     }
 
-    // Check if all characters belong to the user
-    const unauthorizedCharacters = characters.filter((char) => char && char.userId !== userId);
+    // Allow duplicates for:
+    // - own characters (private/public)
+    // - public characters from other users
+    const unauthorizedCharacters = characters.filter(
+      (char) => char && !(char.userId === userId || char.visibility === 'public')
+    );
     if (unauthorizedCharacters.length > 0) {
       throw createError.forbidden('You do not have permission to duplicate one or more characters');
     }
@@ -714,7 +719,7 @@ export const characterService = {
         scenario: character.scenario,
         summary: character.summary,
         rating: character.rating,
-        visibility: character.visibility,
+        visibility: 'private',
         avatar: character.avatar as Record<string, unknown> | null,
         backgroundImg: character.backgroundImg as Record<string, unknown> | null,
         tags: character.tags,
