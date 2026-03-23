@@ -20,6 +20,30 @@ import type {
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = 1024;
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function pickRealmSpeaker(characterNames: string[], userMessage: string): string {
+  if (characterNames.length === 0) return 'Character';
+
+  const normalizedMessage = userMessage.toLowerCase();
+
+  for (const name of characterNames) {
+    const trimmedName = name.trim();
+    if (!trimmedName) continue;
+
+    const escapedName = escapeRegExp(trimmedName.toLowerCase());
+    const nameRegex = new RegExp(`\\b${escapedName}\\b`, 'i');
+    if (nameRegex.test(normalizedMessage)) {
+      return name;
+    }
+  }
+
+  const randomIndex = Math.floor(Math.random() * characterNames.length);
+  return characterNames[randomIndex]!;
+}
+
 export async function runAIOrchestrator(
   input: AIOrchestratorInput
 ): Promise<AIOrchestratorResult> {
@@ -101,6 +125,7 @@ async function buildRealmChatResult(
 
   const realmWithChars = realm as unknown as { characters?: Array<{ name: string }> };
   const characterNames = realmWithChars.characters?.map((c) => c.name) ?? [];
+  const selectedCharacterName = pickRealmSpeaker(characterNames, userMessage);
   const theme = Array.isArray(realm.tags) && realm.tags.length > 0
     ? (realm.tags as string[]).map((t) => (t.startsWith('#') ? t : `#${t}`)).join(', ')
     : '#general';
@@ -109,6 +134,7 @@ async function buildRealmChatResult(
     realmName: realm.name,
     theme,
     characterNames: characterNames.length > 0 ? characterNames : ['Character'],
+    selectedCharacterName,
   });
 
   const plan = planResponse(preprocess.emotion, preprocess.intent);
@@ -160,17 +186,17 @@ async function buildCharacterChatResult(
       characterNotes: character.characterNotes,
       persona: character.persona
         ? {
-            id: character.persona.id,
-            name: character.persona.name,
-            description: character.persona.description,
-          }
+          id: character.persona.id,
+          name: character.persona.name,
+          description: character.persona.description,
+        }
         : null,
       lorebook: character.lorebook
         ? {
-            id: character.lorebook.id,
-            name: character.lorebook.name,
-            entries: character.lorebook.entries,
-          }
+          id: character.lorebook.id,
+          name: character.lorebook.name,
+          entries: character.lorebook.entries,
+        }
         : null,
     },
     userMessage,
