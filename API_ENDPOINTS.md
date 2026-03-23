@@ -1,6 +1,6 @@
 # API Endpoints Documentation
 
-Complete reference for all youruniverse.ai API endpoints.
+Complete reference for all youruniverse.ai API endpoints
 
 ---
 
