@@ -104,7 +104,11 @@ export const createApp = async (): Promise<express.Application> => {
   // Rate Limiting (Redis-based)
   // ============================================
 
-  app.use(redisGeneralRateLimiter);
+  if (config.redis.url) {
+    app.use(redisGeneralRateLimiter);
+  } else {
+    logger.warn('Redis URL not configured; skipping Redis rate limiter');
+  }
 
   // ============================================
   // Idempotency Middleware (for POST/PUT/PATCH)

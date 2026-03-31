@@ -1,4 +1,3 @@
-import argon2 from 'argon2';
 import { authRepository } from './auth.repository.js';
 import { createError, omit } from '../../utils/index.js';
 import { safeAsync } from '../../utils/helpers.js';
@@ -14,43 +13,53 @@ import { config } from '../../config/index.js';
 
 const USERNAME_CHANGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const GUEST_PASSWORD_PLACEHOLDER = 'not-used-open-access';
+let guestUserPromise: Promise<User> | null = null;
 
 async function ensureGuestUserRow(): Promise<User> {
-  const email = config.auth.defaultUserEmail.toLowerCase();
-  const username = config.auth.defaultUsername;
-  const name = config.auth.defaultUserName;
+  if (guestUserPromise) {
+    return guestUserPromise;
+  }
 
-  let userRow = await authRepository.findUserByEmail(email);
-  if (!userRow) {
-    const passwordHash = await argon2.hash(GUEST_PASSWORD_PLACEHOLDER, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 4,
-    });
-    try {
-      userRow = await authRepository.createUser({
-        name,
-        username,
-        email,
-        password: passwordHash,
-      });
-    } catch (error) {
-      const prismaError = error as { code?: string };
-      if (prismaError.code === 'P2002') {
-        userRow = await authRepository.findUserByEmail(email);
-      }
-      if (!userRow) {
-        throw error;
+  guestUserPromise = (async () => {
+    const email = config.auth.defaultUserEmail.toLowerCase();
+    const username = config.auth.defaultUsername;
+    const name = config.auth.defaultUserName;
+
+    let userRow = await authRepository.findUserByEmail(email);
+    if (!userRow) {
+      try {
+        userRow = await authRepository.createUser({
+          name,
+          username,
+          email,
+          // Password auth is disabled in open-access mode, so avoid expensive
+          // runtime hashing on cold starts and store a non-usable placeholder.
+          password: GUEST_PASSWORD_PLACEHOLDER,
+        });
+      } catch (error) {
+        const prismaError = error as { code?: string };
+        if (prismaError.code === 'P2002') {
+          userRow = await authRepository.findUserByEmail(email);
+        }
+        if (!userRow) {
+          throw error;
+        }
       }
     }
-  }
 
-  if (!userRow.isEmailVerified) {
-    userRow = await authRepository.verifyUserEmail(userRow.id);
-  }
+    if (!userRow.isEmailVerified) {
+      userRow = await authRepository.verifyUserEmail(userRow.id);
+    }
 
-  return userRow;
+    return userRow;
+  })();
+
+  try {
+    return await guestUserPromise;
+  } catch (error) {
+    guestUserPromise = null;
+    throw error;
+  }
 }
 
 function userToAuthUser(user: User): AuthUser {

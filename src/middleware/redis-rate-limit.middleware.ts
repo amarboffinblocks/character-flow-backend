@@ -16,6 +16,7 @@ interface RateLimitOptions {
   skipFailedRequests?: boolean;
   skipSuccessfulRequests?: boolean;
   onLimitReached?: (req: Request, res: Response) => void;
+  storeTimeoutMs?: number;
 }
 
 /**
@@ -28,14 +29,26 @@ export const createRedisRateLimiter = (options: RateLimitOptions) => {
     keyGenerator = defaultKeyGenerator,
     message = 'Too many requests, please try again later',
     onLimitReached,
+    storeTimeoutMs = 1200,
   } = options;
 
   const windowSeconds = Math.ceil(windowMs / 1000);
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Never block CORS preflight on Redis round-trips
+    if (req.method === 'OPTIONS') {
+      next();
+      return;
+    }
+
     try {
       const key = keyGenerator(req);
-      const result = await rateLimitStore.check(key, max, windowSeconds);
+      const result = await Promise.race<{ allowed: boolean; remaining: number; resetIn: number }>([
+        rateLimitStore.check(key, max, windowSeconds),
+        new Promise<{ allowed: boolean; remaining: number; resetIn: number }>((_, reject) => {
+          setTimeout(() => reject(new Error(`Rate limit store timeout after ${storeTimeoutMs}ms`)), storeTimeoutMs);
+        }),
+      ]);
 
       // Set rate limit headers (RFC 6585)
       res.setHeader('X-RateLimit-Limit', max.toString());
@@ -44,7 +57,7 @@ export const createRedisRateLimiter = (options: RateLimitOptions) => {
 
       if (!result.allowed) {
         res.setHeader('Retry-After', result.resetIn.toString());
-        
+
         // Log rate limit violation
         logger.warn({
           ip: req.ip,
@@ -79,10 +92,10 @@ export const createRedisRateLimiter = (options: RateLimitOptions) => {
  */
 const defaultKeyGenerator = (req: Request): string => {
   // Trust proxy headers in production
-  const ip = req.ip || 
-    req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || 
+  const ip = req.ip ||
+    req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
     req.headers['x-real-ip']?.toString() ||
-    req.socket.remoteAddress || 
+    req.socket.remoteAddress ||
     'unknown';
   return `ip:${ip}`;
 };
@@ -113,11 +126,11 @@ export const endpointKeyGenerator = (req: Request): string => {
 export const userEndpointKeyGenerator = (req: Request): string => {
   const user = (req as Request & { user?: { id: string } }).user;
   const path = req.path.replace(/\/api\/v\d+\//, '');
-  
+
   if (user?.id) {
     return `user:${user.id}:${req.method}:${path}`;
   }
-  
+
   return endpointKeyGenerator(req);
 };
 
