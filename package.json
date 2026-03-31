@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "generate:routes": "tsx scripts/generate-route-registry.ts",
+    "generate:routes": "node scripts/generate-route-registry.mjs",
     "prebuild": "npm run generate:routes",
     "predev": "npm run generate:routes",
     "dev": "tsx watch src/server.ts",

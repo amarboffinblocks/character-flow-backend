@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const endpointsRoot = join(__dirname, '../src/endpoints');
 const outFile = join(__dirname, '../src/lib/route-registry.generated.ts');
 
-const filePathToRoutePath = (filePath: string): string => {
+const filePathToRoutePath = (filePath) => {
   const unixPath = filePath.split(sep).join('/');
   if (unixPath === 'route.ts' || unixPath === 'route.js') {
     return '/';
@@ -22,8 +22,8 @@ const filePathToRoutePath = (filePath: string): string => {
   return routePath;
 };
 
-const findRouteFiles = (dir: string, baseDir: string = dir): string[] => {
-  const files: string[] = [];
+const findRouteFiles = (dir, baseDir = dir) => {
+  const files = [];
   if (!existsSync(dir)) {
     return files;
   }
@@ -40,20 +40,18 @@ const findRouteFiles = (dir: string, baseDir: string = dir): string[] => {
 };
 
 const routes = findRouteFiles(endpointsRoot, endpointsRoot).sort((a, b) => a.localeCompare(b));
-const importLines: string[] = [];
-const regLines: string[] = [];
+const importLines = [];
+const regLines = [];
 
 routes.forEach((routeFile, i) => {
   const rel = routeFile.split(sep).join('/');
   const base = rel.replace(/\/?route\.(ts|js)$/, '');
-  const routeImport =
-    base === '' ? `../endpoints/route.js` : `../endpoints/${base}/route.js`;
+  const routeImport = base === '' ? `../endpoints/route.js` : `../endpoints/${base}/route.js`;
   importLines.push(`import * as route_i${i} from '${routeImport}';`);
   const mwDir = base === '' ? endpointsRoot : join(endpointsRoot, ...base.split('/'));
   const mwTs = join(mwDir, 'middleware.ts');
   const mwJs = join(mwDir, 'middleware.js');
-  const mwImport =
-    base === '' ? `../endpoints/middleware.js` : `../endpoints/${base}/middleware.js`;
+  const mwImport = base === '' ? `../endpoints/middleware.js` : `../endpoints/${base}/middleware.js`;
   if (existsSync(mwTs) || existsSync(mwJs)) {
     importLines.push(`import * as mw_i${i} from '${mwImport}';`);
     regLines.push(
@@ -66,7 +64,7 @@ routes.forEach((routeFile, i) => {
   }
 });
 
-const content = `// AUTO-GENERATED — do not edit. Run: npm run generate:routes
+const content = `// AUTO-GENERATED — do not edit. Run: npm run generate:routes (node scripts/generate-route-registry.mjs)
 import { Router } from 'express';
 import {
   registerRouteHandlers,

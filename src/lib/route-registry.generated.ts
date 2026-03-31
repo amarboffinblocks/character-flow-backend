@@ -1,4 +1,4 @@
-// AUTO-GENERATED — do not edit. Run: npm run generate:routes
+// AUTO-GENERATED — do not edit. Run: npm run generate:routes (node scripts/generate-route-registry.mjs)
 import { Router } from 'express';
 import {
   registerRouteHandlers,
