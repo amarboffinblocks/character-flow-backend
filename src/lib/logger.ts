@@ -1,9 +1,11 @@
 import pino from 'pino';
 import { config } from '../config/index.js';
 
+const usePrettyLogger = config.app.isDev && process.env.VERCEL !== '1';
+
 export const logger = pino({
   level: config.app.isDev ? 'debug' : 'info',
-  transport: config.app.isDev
+  transport: usePrettyLogger
     ? {
         target: 'pino-pretty',
         options: {

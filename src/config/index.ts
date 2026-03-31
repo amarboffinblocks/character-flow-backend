@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const envSchema = z.object({
     // Application
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
     PORT: z.string().default('8000'),
     HOST: z.string().default('localhost'),
     API_VERSION: z.string().default('v1'),
@@ -101,17 +101,18 @@ if (!parsedEnv.success) {
 }
 
 const env = parsedEnv.data;
+const resolvedNodeEnv = env.NODE_ENV ?? (process.env.VERCEL === '1' ? 'production' : 'development');
 
 export const config = {
     app: {
-        env: env.NODE_ENV,
+        env: resolvedNodeEnv,
         port: parseInt(env.PORT, 10),
         host: env.HOST,
         apiVersion: env.API_VERSION,
         name: env.APP_NAME,
-        isDev: env.NODE_ENV === 'development',
-        isProd: env.NODE_ENV === 'production',
-        isTest: env.NODE_ENV === 'test',
+        isDev: resolvedNodeEnv === 'development',
+        isProd: resolvedNodeEnv === 'production',
+        isTest: resolvedNodeEnv === 'test',
     },
 
     database: {

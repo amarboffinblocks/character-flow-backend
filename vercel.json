@@ -3,12 +3,6 @@
   "version": 2,
   "installCommand": "npm install --include=dev",
   "buildCommand": "npm run vercel:build",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/src/index.ts"
-    }
-  ],
   "functions": {
     "src/index.ts": {
       "maxDuration": 300,
