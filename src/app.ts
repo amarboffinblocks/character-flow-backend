@@ -90,6 +90,24 @@ export const createApp = async (): Promise<express.Application> => {
   app.use(cookieParser());
 
   // ============================================
+  // Health Check (must be before Redis/idempotency middleware)
+  // ============================================
+  app.get('/health', async (_req, res) => {
+    const redis = getRedis();
+    const redisStatus = isRedisConnected() ? 'connected' : (redis ? 'disconnected' : 'not configured');
+
+    res.status(200).json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      services: {
+        database: 'connected',
+        redis: redisStatus,
+      },
+    });
+  });
+
+  // ============================================
   // Initialize Redis Connection
   // ============================================
 
@@ -178,24 +196,6 @@ export const createApp = async (): Promise<express.Application> => {
       ? createGeneratedApiRouter()
       : await createFileRouter(endpointsDir, `/api/v1`);
   app.use(`/api/v1`, apiRouter);
-
-  // ============================================
-  // Health Check (outside versioned API)
-  // ============================================
-
-  app.get('/health', async (_req, res) => {
-    const redisStatus = isRedisConnected() ? 'connected' : (redis ? 'disconnected' : 'not configured');
-
-    res.status(200).json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      services: {
-        database: 'connected',
-        redis: redisStatus,
-      },
-    });
-  });
 
   // ============================================
   // Error Handling
