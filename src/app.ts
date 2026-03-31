@@ -153,16 +153,19 @@ export const createApp = async (): Promise<express.Application> => {
   // Swagger API Documentation (before API routes to avoid conflicts)
   // ============================================
 
-  try {
-    const { setupSwagger } = await import('./lib/swagger.js');
-    setupSwagger(app);
-    logger.info('✅ Swagger documentation initialized');
-  } catch (error) {
-    logger.error({ error }, '❌ Swagger setup failed, continuing without API docs');
-    // Log the full error for debugging
-    if (error instanceof Error) {
-      logger.error({ stack: error.stack }, 'Swagger setup error details');
+  if (!(process.env.VERCEL === '1' && config.app.isProd)) {
+    try {
+      const { setupSwagger } = await import('./lib/swagger.js');
+      setupSwagger(app);
+      logger.info('✅ Swagger documentation initialized');
+    } catch (error) {
+      logger.error({ error }, '❌ Swagger setup failed, continuing without API docs');
+      if (error instanceof Error) {
+        logger.error({ stack: error.stack }, 'Swagger setup error details');
+      }
     }
+  } else {
+    logger.info('Skipping Swagger initialization on Vercel production to reduce cold start');
   }
 
   // ============================================

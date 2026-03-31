@@ -19,17 +19,40 @@ import type {
   MessageListResponse,
   SendMessageStreamResponse,
 } from './chat.types.js';
-import { streamLLM } from './ai/stream-llm.js';
-import { mapProviderToModelProvider } from './ai/model-router.js';
-import { toModelMessages } from './ai/message-converter.js';
-import { addMemories, searchMemories } from '../memory/index.js';
-import { runAIOrchestrator } from '../ai/orchestrator/ai-orchestrator.service.js';
-import { postprocessResponse } from '../ai/postprocessor/postprocessor.service.js';
+import type { ModelProvider } from './ai/model-router.js';
 
 type ChatWithCount = { _count: { messages: number };[key: string]: unknown };
 
 /** Max number of prior messages to include as context for the LLM */
 const MAX_HISTORY_MESSAGES = 50;
+
+async function getChatRuntime() {
+  const [
+    streamLlmModule,
+    modelRouterModule,
+    messageConverterModule,
+    memoryModule,
+    orchestratorModule,
+    postprocessorModule,
+  ] = await Promise.all([
+    import('./ai/stream-llm.js'),
+    import('./ai/model-router.js'),
+    import('./ai/message-converter.js'),
+    import('../memory/index.js'),
+    import('../ai/orchestrator/ai-orchestrator.service.js'),
+    import('../ai/postprocessor/postprocessor.service.js'),
+  ]);
+
+  return {
+    streamLLM: streamLlmModule.streamLLM,
+    mapProviderToModelProvider: modelRouterModule.mapProviderToModelProvider,
+    toModelMessages: messageConverterModule.toModelMessages,
+    addMemories: memoryModule.addMemories,
+    searchMemories: memoryModule.searchMemories,
+    runAIOrchestrator: orchestratorModule.runAIOrchestrator,
+    postprocessResponse: postprocessorModule.postprocessResponse,
+  };
+}
 
 function withMessageCount<T extends ChatWithCount>(chat: T) {
   const { _count, ...rest } = chat;
@@ -252,6 +275,15 @@ export const chatService = {
     input: CreateMessageInput & { trigger?: 'regenerate' | 'edit'; messageId?: string }
   ): Promise<SendMessageStreamResponse> {
     const { chat, model } = await this.getModelForChat(chatId, userId);
+    const {
+      streamLLM,
+      mapProviderToModelProvider,
+      toModelMessages,
+      addMemories,
+      searchMemories,
+      runAIOrchestrator,
+      postprocessResponse,
+    } = await getChatRuntime();
     const provider = mapProviderToModelProvider(model.provider);
 
     let userMessage: SendMessageStreamResponse['userMessage'];
@@ -410,9 +442,17 @@ export const chatService = {
     chatId: string,
     userId: string,
     assistantMessageId: string,
-    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null; metadata?: unknown }; provider: ReturnType<typeof mapProviderToModelProvider> }
+    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null; metadata?: unknown }; provider: ModelProvider }
   ): Promise<SendMessageStreamResponse> {
     const { chat, model, provider } = ctx;
+    const {
+      streamLLM,
+      toModelMessages,
+      addMemories,
+      searchMemories,
+      runAIOrchestrator,
+      postprocessResponse,
+    } = await getChatRuntime();
 
     const assistantMsg = await chatRepository.findMessageById(assistantMessageId);
     if (!assistantMsg) {
@@ -560,9 +600,17 @@ export const chatService = {
     userId: string,
     userMessageId: string,
     newContent: string,
-    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null; metadata?: unknown }; provider: ReturnType<typeof mapProviderToModelProvider> }
+    ctx: { chat: ChatWithCount; model: { provider: string; modelName?: string | null; metadata?: unknown }; provider: ModelProvider }
   ): Promise<SendMessageStreamResponse> {
     const { chat, model, provider } = ctx;
+    const {
+      streamLLM,
+      toModelMessages,
+      addMemories,
+      searchMemories,
+      runAIOrchestrator,
+      postprocessResponse,
+    } = await getChatRuntime();
 
     if (!newContent) {
       throw createError.badRequest('New message content is required');
