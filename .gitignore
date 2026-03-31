@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-# Keep package-lock.json for reproducible builds (required for npm ci)
+# Keep package-lock.json for reproducible builds (requir ed for npm ci)
 # package-lock.json
 yarn.lock
 pnpm-lock.yaml
