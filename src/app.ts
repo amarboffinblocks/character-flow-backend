@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
+import * as helmetModule from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { config } from './config/index.js';
@@ -55,9 +55,11 @@ export const createApp = async (): Promise<express.Application> => {
   // Security Middleware
   // ============================================
 
-  // Vercel's TS compile path can resolve helmet as a module object.
-  // Cast to callable middleware factory for cross-environment compatibility.
-  app.use((helmet as unknown as (options?: Record<string, unknown>) => express.RequestHandler)({
+  // Vercel can resolve helmet as either default export or module object.
+  const helmetFactory = (
+    (helmetModule as unknown as { default?: unknown }).default ?? helmetModule
+  ) as unknown as (options?: Record<string, unknown>) => express.RequestHandler;
+  app.use(helmetFactory({
     contentSecurityPolicy: config.app.isProd,
   }));
 
