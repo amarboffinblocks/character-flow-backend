@@ -26,9 +26,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export const createApp = async (): Promise<express.Application> => {
   const app = express();
 
-  logger.info('Connecting to database...');
-  await prisma.$connect();
-  logger.info('Database connected');
+  // Do not block request handling on startup DB connect in serverless.
+  // This warm-up runs in the background and avoids cold-start timeout cascades.
+  void prisma.$connect()
+    .then(() => logger.info('Database connected'))
+    .catch((error) => logger.warn({ err: error }, 'Database warm-up connect failed; will retry on demand'));
 
   // CORS configuration - supports ngrok, multiple origins, and allow-all
   app.use(cors({
