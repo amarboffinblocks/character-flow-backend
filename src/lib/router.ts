@@ -9,7 +9,7 @@ import type { HttpMethod } from '../types/index.js';
 // Route handler type for file-based routing
 type FileRouteHandler = (req: Request, res: Response) => Promise<void> | void;
 
-interface FileRouteModule {
+export interface FileRouteModule {
   default?: Record<string, FileRouteHandler>;
   GET?: FileRouteHandler;
   POST?: FileRouteHandler;
@@ -18,6 +18,13 @@ interface FileRouteModule {
   DELETE?: FileRouteHandler;
   middleware?: RequestHandler[];
 }
+
+/** Used by the generated Vercel route registry (static imports). */
+export type RouteRegistrationEntry = {
+  routePath: string;
+  routeModule: FileRouteModule;
+  middleware: RequestHandler[] | Record<string, RequestHandler[]>;
+};
 
 // ============================================
 // File-Based Router (Next.js App Router Style)
@@ -32,7 +39,7 @@ const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
  *   /characters/[id]/route.ts -> /characters/:id
  *   /characters/[id]/favorite/route.ts -> /characters/:id/favorite
  */
-const filePathToRoutePath = (filePath: string): string => {
+export const filePathToRoutePath = (filePath: string): string => {
   // Handle root route file
   if (filePath === 'route.ts' || filePath === 'route.js') {
     return '/';
@@ -123,6 +130,65 @@ const loadMiddleware = async (dir: string): Promise<RequestHandler[] | Record<st
   }
 };
 
+export const resolveMiddlewareFromImportedModule = (
+  mod: { default?: unknown; middleware?: unknown } | null | undefined
+): RequestHandler[] | Record<string, RequestHandler[]> => {
+  if (!mod) {
+    return [];
+  }
+  const middleware = mod.default ?? mod.middleware;
+
+  if (Array.isArray(middleware)) {
+    return middleware as RequestHandler[];
+  }
+
+  if (typeof middleware === 'function') {
+    return [middleware as RequestHandler];
+  }
+
+  if (middleware && typeof middleware === 'object' && !Array.isArray(middleware)) {
+    return middleware as Record<string, RequestHandler[]>;
+  }
+
+  return [];
+};
+
+/**
+ * Registers pre-loaded route modules (filesystem scan or generated registry).
+ */
+export const registerRouteHandlers = (
+  router: Router,
+  basePath: string,
+  entries: RouteRegistrationEntry[]
+): void => {
+  for (const { routePath, routeModule: module, middleware } of entries) {
+    for (const method of HTTP_METHODS) {
+      const handler = module[method] || module.default?.[method as keyof typeof module.default];
+
+      if (handler) {
+        const lowerMethod = method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
+
+        const wrappedHandler = asyncRouteHandler(handler);
+
+        let methodMiddleware: RequestHandler[] = [];
+        if (Array.isArray(middleware)) {
+          methodMiddleware = middleware;
+        } else if (middleware && typeof middleware === 'object' && !Array.isArray(middleware)) {
+          const recordMiddleware = middleware as Record<string, RequestHandler[]>;
+          if (method in recordMiddleware && Array.isArray(recordMiddleware[method])) {
+            methodMiddleware = recordMiddleware[method];
+          }
+        }
+
+        const handlers: RequestHandler[] = [...methodMiddleware, wrappedHandler];
+
+        router[lowerMethod](routePath, ...handlers);
+        logger.debug(`Registered ${method} ${basePath}${routePath}`);
+      }
+    }
+  }
+};
+
 /**
  * Creates an Express router from a directory of route files
  */
@@ -133,51 +199,24 @@ export const createFileRouter = async (endpointsDir: string, basePath: string = 
 
   logger.info(`Found ${routeFiles.length} route files in ${endpointsDir}`);
 
+  const entries: RouteRegistrationEntry[] = [];
+
   for (const routeFile of routeFiles) {
     const fullPath = join(absoluteDir, routeFile);
     const routePath = filePathToRoutePath(routeFile);
     const routeDir = join(absoluteDir, routeFile.replace(/\/route\.(ts|js)$/, ''));
 
     try {
-      // Load route module
       const fileUrl = pathToFileURL(fullPath).href;
-      const module: FileRouteModule = await import(fileUrl);
-
-      // Load middleware for this route
+      const routeModule: FileRouteModule = await import(fileUrl);
       const middleware = await loadMiddleware(routeDir);
-
-      // Register each HTTP method
-      for (const method of HTTP_METHODS) {
-        const handler = module[method] || module.default?.[method as keyof typeof module.default];
-
-        if (handler) {
-          const lowerMethod = method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
-          
-          // Wrap handler with asyncRouteHandler to automatically catch errors
-          const wrappedHandler = asyncRouteHandler(handler);
-
-          // Handle method-specific middleware (Record) or general middleware (Array)
-          let methodMiddleware: RequestHandler[] = [];
-          if (Array.isArray(middleware)) {
-            methodMiddleware = middleware;
-          } else if (middleware && typeof middleware === 'object' && !Array.isArray(middleware)) {
-            // Check if it's a Record with method-specific middleware
-            const recordMiddleware = middleware as Record<string, RequestHandler[]>;
-            if (method in recordMiddleware && Array.isArray(recordMiddleware[method])) {
-              methodMiddleware = recordMiddleware[method];
-            }
-          }
-
-          const handlers: RequestHandler[] = [...methodMiddleware, wrappedHandler];
-
-          router[lowerMethod](routePath, ...handlers);
-          logger.debug(`Registered ${method} ${basePath}${routePath}`);
-        }
-      }
+      entries.push({ routePath, routeModule, middleware });
     } catch (error) {
       logger.error({ err: error, route: routeFile }, 'Failed to load route');
     }
   }
+
+  registerRouteHandlers(router, basePath, entries);
 
   return router;
 };

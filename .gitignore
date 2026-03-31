@@ -17,6 +17,7 @@ build/
 .env.test
 .env.production
 .env*.local
+.env.example
 
 # Logs
 logs/

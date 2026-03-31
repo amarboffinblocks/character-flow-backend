@@ -5,6 +5,7 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { config } from './config/index.js';
 import { createFileRouter } from './lib/router.js';
+import { createGeneratedApiRouter } from './lib/route-registry.generated.js';
 import {
   errorHandler,
   notFoundHandler,
@@ -12,6 +13,7 @@ import {
   idempotencyMiddleware,
 } from './middleware/index.js';
 import { logger, getRedis, isRedisConnected } from './lib/index.js';
+import { prisma } from './lib/prisma.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -23,6 +25,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const createApp = async (): Promise<express.Application> => {
   const app = express();
+
+  logger.info('Connecting to database...');
+  await prisma.$connect();
+  logger.info('Database connected');
 
   // CORS configuration - supports ngrok, multiple origins, and allow-all
   app.use(cors({
@@ -154,7 +160,10 @@ export const createApp = async (): Promise<express.Application> => {
   // ============================================
 
   const endpointsDir = join(__dirname, 'endpoints');
-  const apiRouter = await createFileRouter(endpointsDir, `/api/v1`);
+  const apiRouter =
+    process.env.VERCEL === '1'
+      ? createGeneratedApiRouter()
+      : await createFileRouter(endpointsDir, `/api/v1`);
   app.use(`/api/v1`, apiRouter);
 
   // ============================================

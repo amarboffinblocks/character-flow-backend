@@ -40,7 +40,7 @@ if (config.app.isDev && prisma.$on) {
   });
 }
 
-// Graceful shutdown handler
+// Graceful shutdown handler (long-running Node servers; no-op harm on serverless)
 const gracefulShutdown = async (): Promise<void> => {
   try {
     await prisma.$disconnect();
@@ -50,14 +50,11 @@ const gracefulShutdown = async (): Promise<void> => {
   }
 };
 
-// Handle process termination
 process.on('beforeExit', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
 
-if (!config.app.isProd) {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
 
 export default prisma;
 
