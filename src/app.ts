@@ -55,7 +55,9 @@ export const createApp = async (): Promise<express.Application> => {
   // Security Middleware
   // ============================================
 
-  app.use(helmet({
+  // Vercel's TS compile path can resolve helmet as a module object.
+  // Cast to callable middleware factory for cross-environment compatibility.
+  app.use((helmet as unknown as (options?: Record<string, unknown>) => express.RequestHandler)({
     contentSecurityPolicy: config.app.isProd,
   }));
 
