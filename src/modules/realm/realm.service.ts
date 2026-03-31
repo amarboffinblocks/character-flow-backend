@@ -4,7 +4,7 @@ import { createError } from '../../utils/index.js';
 import {
     transformEntityImageUrls,
     transformEntitiesImageUrls,
-} from '../../lib/s3.service.js';
+} from '../../lib/cloudinary.service.js';
 import type {
     CreateRealmInput,
     UpdateRealmInput,

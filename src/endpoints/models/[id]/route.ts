@@ -9,6 +9,11 @@ import { parseModelConfig } from '../../../modules/model/model.types.js';
 
 function serializeModel(m: Model | Record<string, unknown>) {
   const raw = m as Record<string, unknown>;
+  const metadataBase =
+    raw.metadata != null && typeof raw.metadata === 'object' && !Array.isArray(raw.metadata)
+      ? (raw.metadata as Record<string, unknown>)
+      : {};
+  const normalizedMetadata = { ...metadataBase, config: parseModelConfig(raw.metadata) };
   const toDate = (v: unknown): string =>
     v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : String(v ?? '');
   return {
@@ -20,8 +25,8 @@ function serializeModel(m: Model | Record<string, unknown>) {
     modelName: raw.modelName ?? null,
     isActive: Boolean(raw.isActive),
     isDefault: Boolean(raw.isDefault),
-    metadata: raw.metadata ?? null,
-    config: parseModelConfig(raw.metadata),
+    metadata: normalizedMetadata,
+    config: normalizedMetadata.config,
     createdAt: toDate(raw.createdAt),
     updatedAt: toDate(raw.updatedAt),
   };

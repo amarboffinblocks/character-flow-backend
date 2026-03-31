@@ -1090,10 +1090,8 @@ The authentication system uses **Two-Factor Authentication (2FA)** with OTP (One
     - `avatar` (file, optional) - Image file (JPEG, PNG, WebP, GIF, max 10MB)
     - `backgroundImage` (file, optional) - Image file (JPEG, PNG, WebP, GIF, max 10MB)
 - **Image Storage:**
-  - Images are automatically uploaded to **AWS S3** if configured (via environment variables)
-  - If AWS S3 is not configured, images are stored locally in the `./uploads` directory
-  - S3 configuration: Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, and `AWS_S3_BUCKET` environment variables
-  - Optional: Set `AWS_S3_CDN_URL` for CDN access (e.g., CloudFront URL)
+  - Images are uploaded to **Cloudinary** when `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` are set
+  - Delivery URLs are HTTPS (`res.cloudinary.com`) and suitable for `<img>` / Next.js `Image` when allowed in `remotePatterns`
   - Images are optimized using Sharp before upload
   - Public URLs are returned in the response
 - **Request Body (JSON - backward compatible):**
@@ -1210,7 +1208,7 @@ The authentication system uses **Two-Factor Authentication (2FA)** with OTP (One
   - Default `tags`, `alternateMessages`, and `exampleDialogues` are empty arrays if not provided
   - Related entities (persona, lorebook, realm) must belong to the same user
   - Returns full character object with related entities populated
-  - **Image Upload**: When using `multipart/form-data`, images are automatically processed and uploaded to AWS S3 (if configured) or stored locally
+  - **Image Upload**: When using `multipart/form-data`, images are processed (Sharp) and uploaded to Cloudinary
   - **Field Mapping**: Frontend field names are automatically mapped to API field names (e.g., `characterName` → `name`, `visiable` → `visibility`)
   - **Slug Resolution**: For `lorebook` and `persona` fields, provide slugs which will be resolved to UUIDs automatically
   - **Favourite Handling**: If `favourite` is set to `true` in the request, the character will be automatically marked as favourite after creation

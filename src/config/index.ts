@@ -8,15 +8,21 @@ const envSchema = z.object({
     API_VERSION: z.string().default('v1'),
     APP_NAME: z.string().default('youruniverse-api'),
 
-    // Database
+    // Database — DATABASE_URL: Supabase pooler (6543) or direct Postgres; DIRECT_URL: direct 5432 for migrations
     DATABASE_URL: z.string(),
+    DIRECT_URL: z.string(),
+
+    // Open access: single shared guest row for instant login
+    DEFAULT_USER_EMAIL: z.string().email().default('guest@localhost.local'),
+    DEFAULT_USER_USERNAME: z.string().min(1).default('guest'),
+    DEFAULT_USER_NAME: z.string().min(1).default('Guest'),
 
     // Redis
     REDIS_URL: z.string().optional(),
 
-    // JWT
-    JWT_ACCESS_SECRET: z.string(),
-    JWT_REFRESH_SECRET: z.string(),
+    // JWT (unused — kept optional for legacy .env compatibility)
+    JWT_ACCESS_SECRET: z.string().optional().default('unused'),
+    JWT_REFRESH_SECRET: z.string().optional().default('unused'),
     JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
     JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
@@ -50,13 +56,10 @@ const envSchema = z.object({
     OTP_SECRET: z.string().optional(),
     OTP_ISSUER: z.string().default('youruniverse.ai'),
 
-    // AWS S3
-    AWS_ACCESS_KEY_ID: z.string().optional(),
-    AWS_SECRET_ACCESS_KEY: z.string().optional(),
-    AWS_REGION: z.string().optional(),
-    AWS_S3_BUCKET: z.string().optional(),
-    AWS_S3_ENDPOINT: z.string().optional(), // For S3-compatible services (e.g., DigitalOcean Spaces)
-    AWS_S3_CDN_URL: z.string().optional(), // CDN URL for public access (e.g., CloudFront)
+    // Cloudinary (images — required for uploads when not using local-only paths in dev)
+    CLOUDINARY_CLOUD_NAME: z.string().optional(),
+    CLOUDINARY_API_KEY: z.string().optional(),
+    CLOUDINARY_API_SECRET: z.string().optional(),
 
     // AI Pipeline (optional - character chat enhancements)
     AI_PREPROCESSING_ENABLED: z.string().optional().transform((v) => v !== 'false' && v !== '0'),
@@ -113,6 +116,13 @@ export const config = {
 
     database: {
         url: env.DATABASE_URL,
+        directUrl: env.DIRECT_URL,
+    },
+
+    auth: {
+        defaultUserEmail: env.DEFAULT_USER_EMAIL,
+        defaultUsername: env.DEFAULT_USER_USERNAME,
+        defaultUserName: env.DEFAULT_USER_NAME,
     },
 
     redis: {
@@ -163,15 +173,10 @@ export const config = {
         issuer: env.OTP_ISSUER,
     },
 
-    aws: {
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-        region: env.AWS_REGION || 'us-east-1',
-        s3: {
-            bucket: env.AWS_S3_BUCKET,
-            endpoint: env.AWS_S3_ENDPOINT,
-            cdnUrl: env.AWS_S3_CDN_URL,
-        },
+    cloudinary: {
+        cloudName: env.CLOUDINARY_CLOUD_NAME,
+        apiKey: env.CLOUDINARY_API_KEY,
+        apiSecret: env.CLOUDINARY_API_SECRET,
     },
 
     ai: {

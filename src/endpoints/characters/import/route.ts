@@ -145,11 +145,10 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
           return resolve();
         }
 
-        // Map normalized data to import format (avatar/backgroundImg as URLs)
+        // Map normalized data to import format (avatar as URL/object)
         const importPayload = {
           ...characterData,
           avatar: characterData.avatar || undefined,
-          backgroundImg: characterData.backgroundImg || undefined,
         };
 
         // Import character using the service

@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
 import type { Model, ModelQueryParams, ModelConfig } from './model.types.js';
+import { DEFAULT_MODEL_CONFIG } from './model.types.js';
 
 // Prisma client delegate for Model (table "models"). Use getModelDelegate() so we fail fast if schema wasn't generated.
 const getModelDelegate = () => {
@@ -110,6 +111,14 @@ function mergeConfigIntoMetadata(metadata: unknown, config?: ModelConfig): unkno
   const base = metadata != null && typeof metadata === 'object' && !Array.isArray(metadata)
     ? (metadata as Record<string, unknown>)
     : {};
-  if (!config) return Object.keys(base).length ? base : undefined;
-  return { ...base, config };
+  const baseConfig =
+    base.config != null && typeof base.config === 'object' && !Array.isArray(base.config)
+      ? (base.config as Record<string, unknown>)
+      : {};
+  const nextConfig = {
+    ...DEFAULT_MODEL_CONFIG,
+    ...baseConfig,
+    ...(config ?? {}),
+  };
+  return { ...base, config: nextConfig };
 }

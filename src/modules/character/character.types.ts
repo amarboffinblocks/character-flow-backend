@@ -12,7 +12,6 @@ export interface CreateCharacterInput {
   rating?: Rating;
   visibility?: Visibility;
   avatar?: Record<string, unknown>;
-  backgroundImg?: Record<string, unknown>;
   tags?: string[];
   firstMessage?: string;
   alternateMessages?: string[];
@@ -34,7 +33,6 @@ export interface UpdateCharacterInput {
   rating?: Rating;
   visibility?: Visibility;
   avatar?: Record<string, unknown> | null;
-  backgroundImg?: Record<string, unknown> | null;
   tags?: string[];
   firstMessage?: string | null;
   alternateMessages?: string[];
@@ -100,7 +98,6 @@ export interface CreateCharacterData {
   rating: Rating;
   visibility: Visibility;
   avatar?: Record<string, unknown> | null;
-  backgroundImg?: Record<string, unknown> | null;
   tags: string[];
   firstMessage?: string | null;
   alternateMessages: string[];
@@ -123,7 +120,6 @@ export interface UpdateCharacterData {
   rating?: Rating;
   visibility?: Visibility;
   avatar?: Record<string, unknown> | null;
-  backgroundImg?: Record<string, unknown> | null;
   tags?: string[];
   firstMessage?: string | null;
   alternateMessages?: string[];

@@ -359,7 +359,6 @@ export const characterRepository = {
         rating: data.rating,
         visibility: data.visibility,
         avatar: data.avatar ? (data.avatar as Prisma.InputJsonValue) : Prisma.JsonNull,
-        backgroundImg: data.backgroundImg ? (data.backgroundImg as Prisma.InputJsonValue) : Prisma.JsonNull,
         tags: data.tags,
         firstMessage: data.firstMessage,
         alternateMessages: data.alternateMessages,
@@ -392,9 +391,6 @@ export const characterRepository = {
     if (data.visibility) updateData.visibility = data.visibility;
     if (data.avatar !== undefined) {
       updateData.avatar = data.avatar ? (data.avatar as Prisma.InputJsonValue) : Prisma.JsonNull;
-    }
-    if (data.backgroundImg !== undefined) {
-      updateData.backgroundImg = data.backgroundImg ? (data.backgroundImg as Prisma.InputJsonValue) : Prisma.JsonNull;
     }
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.firstMessage !== undefined) updateData.firstMessage = data.firstMessage;

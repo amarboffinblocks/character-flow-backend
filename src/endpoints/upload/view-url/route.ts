@@ -1,17 +1,17 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { sendSuccess } from '../../../utils/response.js';
-import { getPresignedViewUrl } from '../../../lib/s3.service.js';
-import { getS3Client } from '../../../lib/s3.service.js';
+import { resolveImageViewUrl } from '../../../lib/cloudinary.service.js';
 import { createError } from '../../../utils/index.js';
 
 // ============================================
-// POST /api/v1/upload/view-url - Get presigned URL for viewing private S3 images
+// POST /api/v1/upload/view-url
+// Returns a display URL (Cloudinary assets are public HTTPS; passthrough)
 // ============================================
 
 const viewUrlSchema = z.object({
   url: z.string().url('Valid URL is required'),
-  expiresIn: z.number().min(60).max(86400).optional().default(3600), // 1 min to 24 hours
+  expiresIn: z.number().min(60).max(86400).optional().default(3600),
 });
 
 export const POST = async (req: Request, res: Response): Promise<void> => {
@@ -23,13 +23,7 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
 
   const { url, expiresIn } = parsed.data;
 
-  // Check S3 is configured
-  const s3Client = getS3Client();
-  if (!s3Client) {
-    throw createError.badRequest('S3 is not configured.');
-  }
-
-  const viewUrl = await getPresignedViewUrl(url, expiresIn);
+  const viewUrl = await resolveImageViewUrl(url);
 
   sendSuccess(res, {
     viewUrl,

@@ -1,7 +1,14 @@
-import { PrismaClient, SubscriptionPlan, Role, Rating, Visibility } from '@prisma/client';
+import { PrismaClient, SubscriptionPlan, Role, Rating, Visibility, ModelProvider } from '@prisma/client';
 import argon2 from 'argon2';
 
 const prisma = new PrismaClient();
+const defaultModelConfig = {
+  maxTokens: 512,
+  temperature: 0.7,
+  topP: 0.9,
+  frequencyPenalty: 0.4,
+  presencePenalty: 0.2,
+} as const;
 
 async function main() {
   console.log('🌱 Starting seed...');
@@ -135,14 +142,14 @@ async function main() {
     data: [
       {
         lorebookId: lorebook.id,
-        keyword: 'magic',
+        keywords: ['magic'],
         context: 'Magic in this world is powered by ancient crystals found deep underground.',
         isEnabled: true,
         priority: 1,
       },
       {
         lorebookId: lorebook.id,
-        keyword: 'kingdom',
+        keywords: ['kingdom'],
         context: 'The Kingdom of Eldoria is the largest nation, ruled by a council of mages.',
         isEnabled: true,
         priority: 2,
@@ -172,6 +179,59 @@ async function main() {
   });
 
   console.log(`✅ Created sample realm: ${realm.name}`);
+
+  // ============================================
+  // Create Default AI Models
+  // ============================================
+
+  const openaiModel = await prisma.model.upsert({
+    where: { slug: 'openai-gpt-4o-mini' },
+    update: {
+      name: 'OpenAI GPT-4o Mini',
+      description: 'Fast general-purpose OpenAI model.',
+      provider: ModelProvider.openai,
+      modelName: 'gpt-4o-mini',
+      isActive: true,
+      isDefault: true,
+      metadata: { config: defaultModelConfig },
+    },
+    create: {
+      name: 'OpenAI GPT-4o Mini',
+      slug: 'openai-gpt-4o-mini',
+      description: 'Fast general-purpose OpenAI model.',
+      provider: ModelProvider.openai,
+      modelName: 'gpt-4o-mini',
+      isActive: true,
+      isDefault: true,
+      metadata: { config: defaultModelConfig },
+    },
+  });
+
+  const geminiModel = await prisma.model.upsert({
+    where: { slug: 'gemini-2-5-flash' },
+    update: {
+      name: 'Gemini 2.5 Flash',
+      description: 'Low-latency Gemini model for quick responses.',
+      provider: ModelProvider.gemini,
+      modelName: 'gemini-2.5-flash',
+      isActive: true,
+      isDefault: false,
+      metadata: { config: defaultModelConfig },
+    },
+    create: {
+      name: 'Gemini 2.5 Flash',
+      slug: 'gemini-2-5-flash',
+      description: 'Low-latency Gemini model for quick responses.',
+      provider: ModelProvider.gemini,
+      modelName: 'gemini-2.5-flash',
+      isActive: true,
+      isDefault: false,
+      metadata: { config: defaultModelConfig },
+    },
+  });
+
+  console.log(`✅ Created default model: ${openaiModel.name}`);
+  console.log(`✅ Created default model: ${geminiModel.name}`);
 
   console.log('\n🌱 Seed completed successfully!');
 }

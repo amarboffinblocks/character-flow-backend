@@ -140,7 +140,7 @@ idempotency:lock:<userId>:<path>:<method>:<bodyHash>:<idempotencyKey>
 ✅ **This is expected!** Idempotency keys are stored in Redis, not PostgreSQL.
 
 ### Cannot connect to Redis
-- Check Redis is running: `docker ps` or `redis-cli ping`
+- Check Redis is running: `redis-cli ping`
 - Verify `REDIS_URL` in `.env`
 - Check Redis logs for connection errors
 

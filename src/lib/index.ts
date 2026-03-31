@@ -1,13 +1,17 @@
 export { prisma } from './prisma.js';
 export { logger } from './logger.js';
-export { 
-  getRedis, 
+export {
+  getRedis,
   closeRedis,
   isRedisConnected,
-  cache, 
-  sessionStore, 
-  rateLimitStore, 
+  cache,
+  sessionStore,
+  rateLimitStore,
   idempotencyStore,
-  tokenBlacklist 
+  tokenBlacklist,
 } from './redis.js';
-export { getS3Client, uploadToS3, deleteFromS3 } from './s3.service.js';
+export {
+  isCloudinaryConfigured,
+  uploadImageBuffer,
+  deleteUploadedImageIfExists,
+} from './cloudinary.service.js';

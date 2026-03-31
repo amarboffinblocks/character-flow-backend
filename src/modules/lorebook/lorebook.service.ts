@@ -4,10 +4,10 @@ import { generateSlug } from '../../utils/helpers.js';
 import { createError } from '../../utils/index.js';
 import { prisma } from '../../lib/prisma.js';
 import {
-  deleteFromS3IfExists,
+  deleteUploadedImageIfExists,
   transformEntityImageUrls,
   transformEntitiesImageUrls,
-} from '../../lib/s3.service.js';
+} from '../../lib/cloudinary.service.js';
 import type {
   CreateLorebookInput,
   UpdateLorebookInput,
@@ -501,17 +501,17 @@ export const lorebookService = {
       }
     }
 
-    // Delete old S3 avatar when replacing
+    // Delete old stored avatar when replacing
     if (input.avatar !== undefined) {
       const oldAvatar = existingLorebook.avatar as { url?: string } | null;
       if (oldAvatar?.url) {
-        await deleteFromS3IfExists(oldAvatar.url);
+        await deleteUploadedImageIfExists(oldAvatar.url);
       }
     }
     if (input.avatar === null) {
       const oldAvatar = existingLorebook.avatar as { url?: string } | null;
       if (oldAvatar?.url) {
-        await deleteFromS3IfExists(oldAvatar.url);
+        await deleteUploadedImageIfExists(oldAvatar.url);
       }
     }
 
@@ -653,9 +653,9 @@ export const lorebookService = {
       throw createError.forbidden('You do not have permission to delete this lorebook');
     }
 
-    // Delete avatar from S3
+    // Delete avatar from storage
     const avatar = lorebook.avatar as { url?: string } | null;
-    if (avatar?.url) await deleteFromS3IfExists(avatar.url);
+    if (avatar?.url) await deleteUploadedImageIfExists(avatar.url);
 
     await lorebookRepository.deleteLorebook(id);
 

@@ -64,7 +64,11 @@ export const PUT = async (req: Request, res: Response): Promise<void> => {
             });
             return resolve();
           }
-          reject(error);
+          const fallbackMessage =
+            typeof error === 'object' && error !== null && 'message' in error
+              ? String((error as { message?: unknown }).message)
+              : JSON.stringify(error);
+          reject(new Error(fallbackMessage || 'Character update failed'));
         }
       });
     });
@@ -84,7 +88,11 @@ export const PUT = async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
-    throw error;
+    const fallbackMessage =
+      typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message)
+        : JSON.stringify(error);
+    throw new Error(fallbackMessage || 'Character update failed');
   }
 };
 
@@ -98,15 +106,11 @@ async function processCharacterUpdate(
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
   let avatarMetadata = null;
-  let backgroundImgMetadata = null;
 
   if (files?.avatar?.[0]) {
     avatarMetadata = await processImageUpload(files.avatar[0], 'characters');
   }
 
-  if (files?.['backgroundImage']?.[0]) {
-    backgroundImgMetadata = await processImageUpload(files['backgroundImage'][0], 'characters');
-  }
 
   // Parse form data - handle both JSON and form-data
   let bodyData = req.body;
@@ -211,22 +215,6 @@ async function processCharacterUpdate(
     }
   }
 
-  // Handle backgroundImg - prioritize uploaded file, then existing string value
-  let backgroundImg = backgroundImgMetadata;
-  if (!backgroundImg && bodyData.backgroundImage) {
-    if (typeof bodyData.backgroundImage === 'string') {
-      try {
-        backgroundImg = JSON.parse(bodyData.backgroundImage);
-      } catch {
-        // If parsing fails, it's likely a URL string - keep as is but wrap in object format
-        // The service will handle URL strings
-        backgroundImg = bodyData.backgroundImage as any;
-      }
-    } else {
-      backgroundImg = bodyData.backgroundImage;
-    }
-  }
-
   // Map frontend field names to API field names
   const mappedData: any = {
     ...bodyData,
@@ -244,9 +232,6 @@ async function processCharacterUpdate(
   }
   if (avatar !== null) {
     mappedData.avatar = avatar;
-  }
-  if (backgroundImg !== null) {
-    mappedData.backgroundImg = backgroundImg;
   }
   if (bodyData.exampleDialogues !== undefined) {
     mappedData.exampleDialogues = bodyData.exampleDialogues;
@@ -272,7 +257,6 @@ async function processCharacterUpdate(
   delete mappedData.visiable;
   delete mappedData.personality;
   delete mappedData.exampleDialogue;
-  delete mappedData.backgroundImage;
   delete mappedData.favourite;
   delete mappedData.persona; // Remove frontend field name (use personaId)
   delete mappedData.lorebook; // Remove frontend field name (use lorebookId)
@@ -287,7 +271,6 @@ async function processCharacterUpdate(
     scenario: validatedData.scenario ?? undefined,
     summary: validatedData.summary ?? undefined,
     avatar: validatedData.avatar ?? undefined,
-    backgroundImg: validatedData.backgroundImg ?? undefined,
     firstMessage: validatedData.firstMessage ?? undefined,
     authorNotes: validatedData.authorNotes ?? undefined,
     characterNotes: validatedData.characterNotes ?? undefined,

@@ -88,7 +88,11 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
                         });
                         return resolve();
                     }
-                    reject(error);
+                    const fallbackMessage =
+                        typeof error === 'object' && error !== null && 'message' in error
+                            ? String((error as { message?: unknown }).message)
+                            : JSON.stringify(error);
+                    reject(new Error(fallbackMessage || 'Character creation failed'));
                 }
             });
         });
@@ -108,7 +112,11 @@ export const POST = async (req: Request, res: Response): Promise<void> => {
             });
             return;
         }
-        throw error;
+        const fallbackMessage =
+            typeof error === 'object' && error !== null && 'message' in error
+                ? String((error as { message?: unknown }).message)
+                : JSON.stringify(error);
+        throw new Error(fallbackMessage || 'Character creation failed');
     }
 };
 
@@ -121,15 +129,11 @@ async function processCharacterCreation(
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
     let avatarMetadata = null;
-    let backgroundImgMetadata = null;
 
     if (files?.avatar?.[0]) {
         avatarMetadata = await processImageUpload(files.avatar[0], 'characters');
     }
 
-    if (files?.['backgroundImage']?.[0]) {
-        backgroundImgMetadata = await processImageUpload(files['backgroundImage'][0], 'characters');
-    }
 
     // Parse form data - handle both JSON and form-data
     let bodyData = req.body;
@@ -172,20 +176,6 @@ async function processCharacterCreation(
         }
     }
 
-    // Handle backgroundImg - prioritize uploaded file, then JSON data
-    let backgroundImg = backgroundImgMetadata;
-    if (!backgroundImg && bodyData.backgroundImage) {
-        if (typeof bodyData.backgroundImage === 'string') {
-            try {
-                backgroundImg = JSON.parse(bodyData.backgroundImage);
-            } catch {
-                // If parsing fails, ignore
-            }
-        } else {
-            backgroundImg = bodyData.backgroundImage;
-        }
-    }
-
     // Map frontend field names to API field names
     const mappedData = {
         ...bodyData,
@@ -193,7 +183,6 @@ async function processCharacterCreation(
         visibility: bodyData.visiable || bodyData.visibility,
         summary: bodyData.personality || bodyData.summary,
         avatar,
-        backgroundImg,
         exampleDialogues: bodyData.exampleDialogue
             ? (Array.isArray(bodyData.exampleDialogue)
                 ? bodyData.exampleDialogue
@@ -210,7 +199,6 @@ async function processCharacterCreation(
     delete mappedData.visiable;
     delete mappedData.personality;
     delete mappedData.exampleDialogue;
-    delete mappedData.backgroundImage;
     delete mappedData.persona; // Remove frontend field name (use personaId)
     delete mappedData.lorebook; // Remove frontend field name (use lorebookId)
     const shouldFavourite = mappedData.favourite === 'true' || mappedData.favourite === true;
@@ -226,7 +214,6 @@ async function processCharacterCreation(
         scenario: validatedData.scenario ?? undefined,
         summary: validatedData.summary ?? undefined,
         avatar: validatedData.avatar ?? undefined,
-        backgroundImg: validatedData.backgroundImg ?? undefined,
         firstMessage: validatedData.firstMessage ?? undefined,
         authorNotes: validatedData.authorNotes ?? undefined,
         characterNotes: validatedData.characterNotes ?? undefined,

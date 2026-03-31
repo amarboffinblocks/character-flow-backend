@@ -61,7 +61,6 @@ export interface VerifyOtpInput {
 
 export interface AuthResponse {
   user: SafeUser;
-  tokens: TokenPair;
 }
 
 export interface RegisterResponse {
@@ -69,7 +68,7 @@ export interface RegisterResponse {
   message: string;
 }
 
-export interface LoginResponse extends AuthResponse {}
+export type LoginResponse = AuthResponse;
 
 export interface RefreshResponse {
   tokens: TokenPair;

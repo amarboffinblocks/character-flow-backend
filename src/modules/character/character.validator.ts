@@ -40,11 +40,6 @@ const avatarSchema = z
   .optional()
   .nullable();
 
-const backgroundImgSchema = z
-  .record(z.string(), z.unknown())
-  .optional()
-  .nullable();
-
 const tagsSchema = z
   .array(z.string().min(1).max(50))
   .max(20, 'Maximum 20 tags allowed')
@@ -117,7 +112,6 @@ export const createCharacterSchema = z.object({
   rating: ratingSchema.optional().default('SFW'),
   visibility: visibilitySchema.optional().default('private'),
   avatar: avatarSchema,
-  backgroundImg: backgroundImgSchema,
   tags: tagsSchema,
   firstMessage: firstMessageSchema,
   alternateMessages: alternateMessagesSchema,
@@ -138,7 +132,6 @@ export const updateCharacterSchema = z.object({
   rating: ratingSchema.optional(),
   visibility: visibilitySchema.optional(),
   avatar: avatarSchema,
-  backgroundImg: backgroundImgSchema,
   tags: tagsSchema.optional(),
   firstMessage: firstMessageSchema,
   alternateMessages: alternateMessagesSchema.optional(),

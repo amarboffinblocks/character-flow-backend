@@ -29,6 +29,7 @@ export async function buildCharacterContext(
     authorNotes: character.authorNotes,
     characterNotes: character.characterNotes,
     emotion,
+    intent: input.intent,
   });
 
   let loreContext = '';

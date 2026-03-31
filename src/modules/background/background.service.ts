@@ -1,5 +1,5 @@
 import { backgroundRepository } from './background.repository.js';
-import { transformEntitiesImageUrls, transformEntityImageUrls } from '../../lib/s3.service.js';
+import { transformEntitiesImageUrls, transformEntityImageUrls } from '../../lib/cloudinary.service.js';
 import { createError } from '../../utils/index.js';
 import type {
   CreateBackgroundInput,

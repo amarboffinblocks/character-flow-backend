@@ -136,8 +136,8 @@ export const backgroundRepository = {
     if (background && background.image) {
       const imageMetadata = background.image as any;
       if (imageMetadata.url) {
-        const { deleteFromS3IfExists } = await import('../../lib/s3.service.js');
-        await deleteFromS3IfExists(imageMetadata.url);
+        const { deleteUploadedImageIfExists } = await import('../../lib/cloudinary.service.js');
+        await deleteUploadedImageIfExists(imageMetadata.url);
       }
     }
 

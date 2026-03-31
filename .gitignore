@@ -69,11 +69,6 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Docker
-docker-compose.override.yml
-docker-compose.yml
-.dockerignore
-
 # Testing
 .vitest/
 test-results/

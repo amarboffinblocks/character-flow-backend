@@ -51,18 +51,18 @@ export function streamLLM({
 }: StreamLLMInput): StreamLLMResult {
   const aiProvider = getAIProvider(provider);
   const modelName = resolveModel(provider, model);
+  const supportsPenalty = provider !== "gemini";
 
   // Accumulate partial text for saving on error (stream interrupted midway)
   const partialText = { current: "" };
-  console.log("messagedddddddd", messages)
   const result = streamText({
     model: aiProvider(modelName),
     messages,
     temperature,
     ...(maxTokens != null && { maxTokens }),
     ...(topP != null && { topP }),
-    ...(frequencyPenalty != null && { frequencyPenalty }),
-    ...(presencePenalty != null && { presencePenalty }),
+    ...(supportsPenalty && frequencyPenalty != null && { frequencyPenalty }),
+    ...(supportsPenalty && presencePenalty != null && { presencePenalty }),
     experimental_transform: smoothStream(SMOOTH_STREAM_CONFIG),
     onChunk: ({ chunk }) => {
       if (chunk.type === "text-delta" && typeof chunk.text === "string") {

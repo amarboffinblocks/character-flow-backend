@@ -1,18 +1,13 @@
 import type { Request, Response } from 'express';
-import { authService, loginSchema } from '../../../modules/auth/index.js';
+import { authService } from '../../../modules/auth/index.js';
 import { sendSuccess } from '../../../utils/response.js';
 
 // ============================================
 // POST /api/v1/auth/login
-// Step 1: Verify credentials and request OTP
+// Ensures default guest user exists — no credentials, no tokens
 // ============================================
 
-export const POST = async (req: Request, res: Response): Promise<void> => {
-  // Validate request body
-  const validatedData = loginSchema.parse(req.body);
-
-  // Step 1: Verify credentials and send OTP
-  const result = await authService.loginStep1(validatedData);
-
-  sendSuccess(res, result, result.message);
+export const POST = async (_req: Request, res: Response): Promise<void> => {
+  const result = await authService.instantLogin();
+  sendSuccess(res, result, 'Entered');
 };

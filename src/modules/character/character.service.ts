@@ -6,10 +6,10 @@ import { normalizeCharacterData } from '../../utils/character-card.parser.js';
 import { calculateCharacterTokens } from '../../utils/character-tokens.js';
 import { prisma } from '../../lib/prisma.js';
 import {
-  deleteFromS3IfExists,
+  deleteUploadedImageIfExists,
   transformEntityImageUrls,
   transformEntitiesImageUrls,
-} from '../../lib/s3.service.js';
+} from '../../lib/cloudinary.service.js';
 import type {
   CreateCharacterInput,
   UpdateCharacterInput,
@@ -174,7 +174,6 @@ export const characterService = {
       rating: input.rating ?? 'SFW',
       visibility,
       avatar: input.avatar ?? null,
-      backgroundImg: input.backgroundImg ?? null,
       tags: normalizedCreateTags,
       firstMessage: input.firstMessage ?? null,
       alternateMessages: input.alternateMessages ?? [],
@@ -399,30 +398,18 @@ export const characterService = {
       authorName = user?.name ?? null;
     }
 
-    // Delete old S3 images when replacing with new uploads
+    // Delete old stored images when replacing with new uploads
     if (input.avatar !== undefined && input.avatar !== null) {
       const oldAvatar = existingCharacter.avatar as { url?: string } | null;
       if (oldAvatar?.url) {
-        await deleteFromS3IfExists(oldAvatar.url);
-      }
-    }
-    if (input.backgroundImg !== undefined && input.backgroundImg !== null) {
-      const oldBackground = existingCharacter.backgroundImg as { url?: string } | null;
-      if (oldBackground?.url) {
-        await deleteFromS3IfExists(oldBackground.url);
+        await deleteUploadedImageIfExists(oldAvatar.url);
       }
     }
     // Also delete when explicitly setting to null (removing image)
     if (input.avatar === null) {
       const oldAvatar = existingCharacter.avatar as { url?: string } | null;
       if (oldAvatar?.url) {
-        await deleteFromS3IfExists(oldAvatar.url);
-      }
-    }
-    if (input.backgroundImg === null) {
-      const oldBackground = existingCharacter.backgroundImg as { url?: string } | null;
-      if (oldBackground?.url) {
-        await deleteFromS3IfExists(oldBackground.url);
+        await deleteUploadedImageIfExists(oldAvatar.url);
       }
     }
 
@@ -465,7 +452,6 @@ export const characterService = {
       ...(input.rating && { rating: input.rating }),
       ...(input.visibility && { visibility: input.visibility }),
       ...(input.avatar !== undefined && { avatar: input.avatar }),
-      ...(input.backgroundImg !== undefined && { backgroundImg: input.backgroundImg }),
       ...(tagsToStore !== undefined && { tags: tagsToStore }),
       ...(updatedTokens !== undefined && { tokens: updatedTokens }),
       ...(input.firstMessage !== undefined && { firstMessage: input.firstMessage }),
@@ -502,11 +488,11 @@ export const characterService = {
       throw createError.forbidden('You do not have permission to delete this character');
     }
 
-    // Delete associated images from S3
+    // Delete associated images from storage
     const avatar = character.avatar as { url?: string } | null;
     const backgroundImg = character.backgroundImg as { url?: string } | null;
-    if (avatar?.url) await deleteFromS3IfExists(avatar.url);
-    if (backgroundImg?.url) await deleteFromS3IfExists(backgroundImg.url);
+    if (avatar?.url) await deleteUploadedImageIfExists(avatar.url);
+    if (backgroundImg?.url) await deleteUploadedImageIfExists(backgroundImg.url);
 
     await characterRepository.deleteCharacter(id);
 
@@ -617,7 +603,6 @@ export const characterService = {
       rating: character.rating,
       visibility: "private",
       avatar: character.avatar as Record<string, unknown> | null,
-      backgroundImg: character.backgroundImg as Record<string, unknown> | null,
       tags: character.tags,
       firstMessage: character.firstMessage,
       alternateMessages: character.alternateMessages,
@@ -721,7 +706,6 @@ export const characterService = {
         rating: character.rating,
         visibility: 'private',
         avatar: character.avatar as Record<string, unknown> | null,
-        backgroundImg: character.backgroundImg as Record<string, unknown> | null,
         tags: character.tags,
         firstMessage: character.firstMessage,
         alternateMessages: character.alternateMessages,
@@ -861,18 +845,12 @@ export const characterService = {
       authorName = userActualName;
     }
 
-    // Normalize avatar/backgroundImg: accept string URL or { url } object (V1/V2/PNG formats)
+    // Normalize avatar: accept string URL or { url } object (V1/V2/PNG formats)
     const avatarObj =
       characterData.avatar && typeof characterData.avatar === 'object' && 'url' in characterData.avatar
         ? (characterData.avatar as { url: string })
         : typeof characterData.avatar === 'string' && characterData.avatar.trim()
           ? { url: characterData.avatar }
-          : null;
-    const backgroundObj =
-      characterData.backgroundImg && typeof characterData.backgroundImg === 'object' && 'url' in characterData.backgroundImg
-        ? (characterData.backgroundImg as { url: string })
-        : typeof characterData.backgroundImg === 'string' && characterData.backgroundImg.trim()
-          ? { url: characterData.backgroundImg }
           : null;
 
     const tagNames = Array.isArray(characterData.tags)
@@ -901,7 +879,6 @@ export const characterService = {
       rating: ratingCategory,
       visibility,
       avatar: avatarObj,
-      backgroundImg: backgroundObj,
       tags: tagNames.length > 0 ? tagNames.map((n: string) => n.toLowerCase()) : (Array.isArray(characterData.tags) ? characterData.tags : []),
       firstMessage: characterData.firstMessage ?? null,
       alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],
@@ -987,18 +964,12 @@ export const characterService = {
           authorName = userActualName;
         }
 
-        // Normalize avatar/backgroundImg (string URL or { url } object)
+        // Normalize avatar (string URL or { url } object)
         const avatarObj =
           characterData.avatar && typeof characterData.avatar === 'object' && 'url' in characterData.avatar
             ? (characterData.avatar as { url: string })
             : typeof characterData.avatar === 'string' && characterData.avatar.trim()
               ? { url: characterData.avatar }
-              : null;
-        const backgroundObj =
-          characterData.backgroundImg && typeof characterData.backgroundImg === 'object' && 'url' in characterData.backgroundImg
-            ? (characterData.backgroundImg as { url: string })
-            : typeof characterData.backgroundImg === 'string' && characterData.backgroundImg.trim()
-              ? { url: characterData.backgroundImg }
               : null;
 
         const bulkTagNames = Array.isArray(characterData.tags)
@@ -1027,7 +998,6 @@ export const characterService = {
           rating: bulkRatingCategory,
           visibility,
           avatar: avatarObj,
-          backgroundImg: backgroundObj,
           tags: bulkTagNames.length > 0 ? bulkTagNames.map((n) => n.toLowerCase()) : (Array.isArray(characterData.tags) ? characterData.tags : []),
           firstMessage: characterData.firstMessage ?? null,
           alternateMessages: Array.isArray(characterData.alternateMessages) ? characterData.alternateMessages : [],

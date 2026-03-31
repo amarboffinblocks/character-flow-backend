@@ -5,10 +5,10 @@ import { createError } from '../../utils/index.js';
 import { processImageUpload } from '../../utils/image.helper.js';
 import { prisma } from '../../lib/prisma.js';
 import {
-  deleteFromS3IfExists,
+  deleteUploadedImageIfExists,
   transformEntityImageUrls,
   transformEntitiesImageUrls,
-} from '../../lib/s3.service.js';
+} from '../../lib/cloudinary.service.js';
 import type {
   CreatePersonaInput,
   UpdatePersonaInput,
@@ -271,22 +271,22 @@ export const personaService = {
       throw createError.forbidden('You do not have permission to update this persona');
     }
 
-    // Delete old S3 images when replacing
+    // Delete old stored images when replacing
     if (input.avatar !== undefined && input.avatar !== null) {
       const oldAvatar = existingPersona.avatar as { url?: string } | null;
-      if (oldAvatar?.url) await deleteFromS3IfExists(oldAvatar.url);
+      if (oldAvatar?.url) await deleteUploadedImageIfExists(oldAvatar.url);
     }
     if (input.avatar === null) {
       const oldAvatar = existingPersona.avatar as { url?: string } | null;
-      if (oldAvatar?.url) await deleteFromS3IfExists(oldAvatar.url);
+      if (oldAvatar?.url) await deleteUploadedImageIfExists(oldAvatar.url);
     }
     if (input.backgroundImg !== undefined && input.backgroundImg !== null) {
       const oldBg = existingPersona.backgroundImg as { url?: string } | null;
-      if (oldBg?.url) await deleteFromS3IfExists(oldBg.url);
+      if (oldBg?.url) await deleteUploadedImageIfExists(oldBg.url);
     }
     if (input.backgroundImg === null) {
       const oldBg = existingPersona.backgroundImg as { url?: string } | null;
-      if (oldBg?.url) await deleteFromS3IfExists(oldBg.url);
+      if (oldBg?.url) await deleteUploadedImageIfExists(oldBg.url);
     }
 
     // Generate new slug if name is being updated
@@ -347,11 +347,11 @@ export const personaService = {
       throw createError.forbidden('You do not have permission to delete this persona');
     }
 
-    // Delete images from S3
+    // Delete images from storage
     const avatar = persona.avatar as { url?: string } | null;
     const backgroundImg = persona.backgroundImg as { url?: string } | null;
-    if (avatar?.url) await deleteFromS3IfExists(avatar.url);
-    if (backgroundImg?.url) await deleteFromS3IfExists(backgroundImg.url);
+    if (avatar?.url) await deleteUploadedImageIfExists(avatar.url);
+    if (backgroundImg?.url) await deleteUploadedImageIfExists(backgroundImg.url);
 
     // Delete persona
     await personaRepository.deletePersona(id);
