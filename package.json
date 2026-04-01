@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "generate:routes": "node scripts/generate-route-registry.mjs",
     "prebuild": "npm run generate:routes",
     "predev": "npm run generate:routes",
