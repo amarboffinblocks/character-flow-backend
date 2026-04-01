@@ -8,9 +8,9 @@ const envSchema = z.object({
     API_VERSION: z.string().default('v1'),
     APP_NAME: z.string().default('youruniverse-api'),
 
-    // Database — DATABASE_URL: Supabase pooler (6543) or direct Postgres; DIRECT_URL: direct 5432 for migrations
+    // Database — DATABASE_URL: primary runtime URL; DIRECT_URL: optional direct URL for migrations
     DATABASE_URL: z.string(),
-    DIRECT_URL: z.string(),
+    DIRECT_URL: z.string().optional(),
 
     // Open access: single shared guest row for instant login
     DEFAULT_USER_EMAIL: z.string().email().default('guest@localhost.local'),
@@ -117,7 +117,7 @@ export const config = {
 
     database: {
         url: env.DATABASE_URL,
-        directUrl: env.DIRECT_URL,
+        directUrl: env.DIRECT_URL ?? env.DATABASE_URL,
     },
 
     auth: {
