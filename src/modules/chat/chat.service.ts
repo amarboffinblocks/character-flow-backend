@@ -25,6 +25,76 @@ type ChatWithCount = { _count: { messages: number };[key: string]: unknown };
 
 /** Max number of prior messages to include as context for the LLM */
 const MAX_HISTORY_MESSAGES = 50;
+const AUTO_TITLE_MAX_LENGTH = 70;
+const GENERIC_CHAT_TITLES = new Set(['new chat', 'untitled', 'untitled chat', 'chat', 'new conversation']);
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function hasMeaningfulChatTitle(title: string | null | undefined): boolean {
+  if (!title) return false;
+  const normalized = normalizeWhitespace(title).toLowerCase();
+  if (!normalized) return false;
+  return !GENERIC_CHAT_TITLES.has(normalized);
+}
+
+function isMeaningfulUserInput(input: string | null | undefined): boolean {
+  if (!input) return false;
+  const normalized = normalizeWhitespace(input);
+  if (!normalized) return false;
+  if (normalized === '[Image attached]') return false;
+
+  const lowered = normalized.toLowerCase();
+  const boilerplate = new Set([
+    'hi',
+    'hello',
+    'hey',
+    'yo',
+    'start',
+    'start chat',
+    'new chat',
+    'test',
+    'ok',
+    'okay',
+    'hmm',
+    '...',
+    '.',
+  ]);
+  if (boilerplate.has(lowered)) return false;
+  if (normalized.length < 6) return false;
+  return true;
+}
+
+function generateTitleFromUserInput(input: string): string | null {
+  const normalized = normalizeWhitespace(input)
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\s*[?.!,;:]+\s*$/g, '');
+  if (!isMeaningfulUserInput(normalized)) return null;
+
+  const words = normalized.split(' ').filter(Boolean).slice(0, 10);
+  if (words.length === 0) return null;
+
+  let title = words.join(' ');
+  if (title.length > AUTO_TITLE_MAX_LENGTH) {
+    title = `${title.slice(0, AUTO_TITLE_MAX_LENGTH - 1).trimEnd()}…`;
+  }
+  return title;
+}
+
+async function ensureMeaningfulChatTitleFromUserMessage(args: {
+  chatId: string;
+  chatTitle: string | null | undefined;
+  userInput: string | null | undefined;
+}): Promise<void> {
+  const { chatId, chatTitle, userInput } = args;
+  if (hasMeaningfulChatTitle(chatTitle)) return;
+  if (!isMeaningfulUserInput(userInput)) return;
+
+  const nextTitle = generateTitleFromUserInput(userInput ?? '');
+  if (!nextTitle) return;
+  await chatRepository.updateChat(chatId, { title: nextTitle });
+}
 
 async function getChatRuntime() {
   const [
@@ -323,6 +393,11 @@ export const chatService = {
       chatId,
       role: 'user',
       content: persistedContent,
+    });
+    await ensureMeaningfulChatTitleFromUserMessage({
+      chatId,
+      chatTitle: (chat as { title?: string | null })?.title ?? null,
+      userInput: input.content?.trim() ?? persistedContent,
     });
     userMessage = {
       id: created.id,
@@ -633,6 +708,11 @@ export const chatService = {
       chatId,
       role: 'user',
       content: newContent,
+    });
+    await ensureMeaningfulChatTitleFromUserMessage({
+      chatId,
+      chatTitle: (chat as { title?: string | null })?.title ?? null,
+      userInput: newContent,
     });
 
     const userMessage = {
